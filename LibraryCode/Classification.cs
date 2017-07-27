@@ -6,7 +6,24 @@ using System.Threading.Tasks;
 
 namespace LibraryCode
 {
-    public interface IClassification : IComparable
+    // new try
+    /* public abstract class CallNumber
+    {
+        public static bool operator <=(CallNumber n1, CallNumber n2)
+        {
+            return leq(n1, n2);
+        }
+        public static bool operator >=(CallNumber n1, CallNumber n2)
+        {
+            return !leq(n1, n2);
+        }
+        // can't be abstract. Oh well.
+        public static bool leq(CallNumber n1, CallNumber n2)
+        {
+            return false;
+        }
+    } */
+    /*    public interface IClassification : IComparable
     //public interface IClassification<TCallNum>: IComparable<TCallNum> // interface inheritance! Ha!
     {
         List<string> subject();
@@ -18,7 +35,7 @@ namespace LibraryCode
 
         // no visibility modifier in interfaces?
         //int CompareTo(TCallNum other);
-    }
+    } */
     public class CallNumberException : Exception
     {
         public CallNumberException(string message) : base(message)
@@ -43,7 +60,7 @@ namespace LibraryCode
     // http://stackoverflow.com/questions/2032636/how-to-make-an-abstract-base-class-icomparable-that-doesnt-compare-two-separate
 
     // any 'where' constraints needed
-    public abstract class CallNumber<Derived> : IClassification
+    public abstract class CallNumber// <Derived> //: IClassification
     {
         public CallNumber(string cnStr) { this.cnStr = cnStr; }
         // remember, 'protected' lets derived classes access it.
@@ -55,18 +72,18 @@ namespace LibraryCode
         public abstract List<string> subject();
 
         // public abstract int CompareTo(CallNumber<Derived> other);
-        public abstract int CompareTo(object obj);
+        public abstract int CompareTo(CallNumber obj);
 
         // weird, still don't fully understand the template stuff.
         // this compiles, but I can't use it to compare two call numbers...
         // Operators only in the subclass
-        public static bool operator <= (CallNumber<Derived> c1, CallNumber<Derived> c2)
+        public static bool operator <= (CallNumber c1, CallNumber c2)
         {
-            // oops. but this should call the subclass...
+            // This will call the subclass method when overridden.
             return c1.CompareTo(c2) <= 0;
 
         }
-        public static bool operator >=(CallNumber<Derived> c1, CallNumber<Derived> c2)
+        public static bool operator >=(CallNumber c1, CallNumber c2)
         {
             return c1.CompareTo(c2) >= 0;
 
@@ -77,8 +94,7 @@ namespace LibraryCode
     // TODO: static dewey classification object here? when to initialize?
 
     // I don't have to specify the interface on the base class?
-    public class DeweyCallNumber : CallNumber<DeweyCallNumber>, 
-                                   IClassification
+    public class DeweyCallNumber : CallNumber// <DeweyCallNumber> //, IClassification
                                    
     {
         public decimal cn { get; }
@@ -130,19 +146,30 @@ namespace LibraryCode
             return cn.CompareTo(other.cn);
         } */
 
-        public override int CompareTo(object other)
+        public override int CompareTo(CallNumber other)
         {
+            // check and throw if other isn't Dewey? Or will this do it?
             return cn.CompareTo(((DeweyCallNumber)other).cn);
         }
 
-
     }
-    /*
-    public class LOCCallNumber : CallNumber
+    
+    public class LOCCallNumber : CallNumber //<LOCCallNumber>
     {
         private string letters;
         private string num;
-        private string letter2
-    } */
+        public LOCCallNumber(String cnStr) : base(cnStr)
+        {
+        }
+        public override int CompareTo(CallNumber obj)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override List<string> subject()
+        {
+            throw new NotImplementedException();
+        }
+    } 
 
 }

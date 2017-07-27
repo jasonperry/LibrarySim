@@ -7,17 +7,18 @@ using System.Threading.Tasks;
 namespace LibraryCode
 {
     /** A book. */
-    public class Book
+    public class Book  //<DeweyCallNumber>, IComparable<LOCCallNumber>
     {
         public int length { get; }
         public int width { get; }
         public int height { get; }
-        // can have multiple classifications.
-        List<IClassification> callNumbers; 
+        // can have multiple classifications, but comparisons need to be explicitly
+        //  implemented
+        List<CallNumber> callNumbers; 
         // TODO: properly represented MARC or BibFrame fields.
         // A Record subtype for that, which is passed into the constructor.
 
-        public Book(int length, int width, int height, IClassification callNumber)
+        public Book(int length, int width, int height, CallNumber callNumber)
         {
             this.length = length;
             this.width = width;
@@ -26,11 +27,11 @@ namespace LibraryCode
         }
 
         /** Get call number of type determined by type parameter. */
-        public IClassification getCN<CN>()
+        public CallNumber getCN<TCallNum>()
         {
-            foreach(IClassification cn in callNumbers)
+            foreach(CallNumber cn in callNumbers)
             {
-                if (cn.GetType() == typeof(CN))
+                if (cn.GetType() == typeof(TCallNum))
                 {
                     return cn;
                 }
@@ -40,7 +41,7 @@ namespace LibraryCode
 
         public DeweyCallNumber getDDC()
         {
-            foreach (IClassification cn in callNumbers)
+            foreach (CallNumber cn in callNumbers)
             {
                 if (cn.GetType() == typeof(DeweyCallNumber))
                 {
@@ -49,6 +50,40 @@ namespace LibraryCode
             }
             throw new CallNumberException("Book does not have Dewey Call Number");
         }
+
+        public LOCCallNumber getLOC()
+        {
+            foreach (CallNumber cn in callNumbers)
+            {
+                if (cn.GetType() == typeof(LOCCallNumber))
+                {
+                    return (LOCCallNumber)cn;
+                }
+            }
+            throw new CallNumberException("Book does not have LOC Call Number");
+        }
+        // Maybe not needed.
         bool hasCallNumber(Type classificationType) { return false; }
+
+        // Hopefully can use this as comparer
+        public int Compare<T>(Book other)
+        {
+            return this.getCN<T>().CompareTo(other.getCN<T>());
+        }
+
+        /* int IComparable<DeweyCallNumber>.CompareTo(DeweyCallNumber other)
+        {
+            throw new NotImplementedException();
+        }
+
+        int IComparable<LOCCallNumber>.CompareTo(LOCCallNumber other)
+        {
+            throw new NotImplementedException();
+        } */
+
+        public int CompareTo<T>(object obj)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
