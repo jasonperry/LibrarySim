@@ -13,7 +13,7 @@ namespace LibraryCmd
         static void bookshelfTest1()
         {
             Console.WriteLine("Testing bookshelf creation");
-            Bookshelf<DeweyCallNumber> bs1 = new Bookshelf<DeweyCallNumber>(5, 1000, 200, 325);
+            Bookcase<DeweyCallNumber> bs1 = new Bookcase<DeweyCallNumber>(5, 1000, 200, 325);
             Console.WriteLine("Created shelf with {0} shelves, {1} mm of linear space.",
                               bs1.numShelves, bs1.freeSpace);
         }
