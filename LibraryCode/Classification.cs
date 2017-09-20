@@ -172,4 +172,23 @@ namespace LibraryCode
         }
     } 
 
+    /** List of strings, such as category, author, or lastname, first */
+    public class AlphaStringsCallNumber : CallNumber 
+    {
+        private List<string> cnStrings;
+
+        public AlphaStringsCallNumber(String cnStr): base(cnStr) {
+            // TODO: split by whitespace and store in the list
+        }
+
+        public override int CompareTo(CallNumber obj) {
+            throw new NotImplementedException();
+        }
+
+        public override List<string> subject()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
 }
