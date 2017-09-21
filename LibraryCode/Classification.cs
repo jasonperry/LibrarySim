@@ -97,6 +97,7 @@ namespace LibraryCode
     public class DeweyCallNumber : CallNumber// <DeweyCallNumber> //, IClassification
                                    
     {
+        // TODO: only return a string (in base), make rest of fields private.
         public decimal cn { get; }
         public string authorLastname { get; }
         public string cutterNumber;
@@ -120,15 +121,18 @@ namespace LibraryCode
         }
         public DeweyCallNumber(String cnStr) : base(cnStr)
         {
+            string[] split = cnStr.Split(new char[]{' '});
             decimal d;
             // TODO: check for space with year/author following
             if (decimal.TryParse(cnStr, out d))
             {
-                cn = (decimal) d;
+                cn = (decimal)d;
             }
-            else
+            else goto fail;
+            fail:
             {
-                throw new CallNumberException("Could not parse string as Dewey Decimal");
+                throw new CallNumberException
+                    ("Could not parse string " + cnStr + " as Dewey Decimal");
             }
             
         }
@@ -148,8 +152,10 @@ namespace LibraryCode
 
         public override int CompareTo(CallNumber other)
         {
+            int comp = cn.CompareTo(((DeweyCallNumber)other).cn);
             // check and throw if other isn't Dewey? Or will this do it?
-            return cn.CompareTo(((DeweyCallNumber)other).cn);
+            if (comp != 0) return comp;
+            return authorLastname.CompareTo(((DeweyCallNumber)other).authorLastname);
         }
 
     }

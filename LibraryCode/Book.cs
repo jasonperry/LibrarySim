@@ -15,9 +15,10 @@ namespace LibraryCode
         // can have multiple classifications, but comparisons need to be explicitly
         //  implemented
         List<CallNumber> callNumbers; 
-        // TODO: properly represented MARC or BibFrame fields.
-        // A Record subtype for that, which is passed into the constructor.
 
+        // TODO: properly represented MARC or BibFrame fields.
+        // A nested struct for that, which is passed into the constructor.
+        // And a pointer to the location of the book files
         public Book(int length, int width, int height, CallNumber callNumber)
         {
             this.length = length;

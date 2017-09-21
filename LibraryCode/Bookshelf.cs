@@ -15,6 +15,11 @@ namespace LibraryCode
     /** A multi-shelf sorting bookcase with a call number type parameter. */
     public class Bookcase<TCallNum> : IComparer<Book> where TCallNum : CallNumber
     {
+        /** Dimensions of the case itself. */
+        public int width { get; protected set; }
+        public int depth { get; protected set; }
+        public int height { get; protected set; }
+
         public int numShelves { get; }
         /** Dimensions of shelves in this bookcase in mm. *
           * can have different height for every shelf. */
@@ -50,24 +55,31 @@ namespace LibraryCode
             public int height;
             // length is from outer class
             public int freeSpace;
-            public List<BookPlace> contents; // Maybe array for speed!
+            public List<BookPlace> contents; // Maybe array for speed.
             public TCallNum lastCN;
 
             int lastpos = 0;
             // would be nice to have aliases to first and last call number...
 
             /** Constructor updates parent bookshelf's available space. */
-            public Shelf(int height, int length)
+            public Shelf(int height, int length) // if nested, shouldn't take length.
             {
                 //this.index = 0; 
                 this.height = height;
-                this.freeSpace = length;
+                this.freeSpace = length; 
                 this.contents = new List<BookPlace>();
                 // shouldn't matter, won't check if shelf is empty
                 this.lastCN = default(TCallNum);
             }
+            /** Add book to the end of the shelf. */
             public void Append(Book book)
             {
+                if (freeSpace < book.width) {
+                    throw new ShelvingException("Book of width " +
+                        book.width.ToString() +
+                        " does not fit on shelf with free space of " + 
+                        freeSpace.ToString());
+                }
                 // create new bookplace
                 var place = new BookPlace(book, lastpos);
                 place.replace(); // put book there.
@@ -83,7 +95,7 @@ namespace LibraryCode
 
         /** Create a bookshelf with specified dimensions and number of shelves. */
         public Bookcase(int numShelves, int shelfLength, int shelfDepth, int shelfHeight)
-        {
+        {               // int sideMargin, bottomMargin, topMargin, shelfSeparation
             this.numShelves = numShelves;
             this._shelfLength = shelfLength;
             this._shelfDepth = shelfDepth;
@@ -226,7 +238,7 @@ namespace LibraryCode
             return null;
         }
 
-        // HA HA HA I HAVE DONE IT
+        // Trick to make this class a comparer for the selected call number type.
         public int Compare(Book b1, Book b2)
         {
             return b1.Compare<TCallNum>(b2);
