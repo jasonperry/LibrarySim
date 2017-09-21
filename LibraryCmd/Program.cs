@@ -37,10 +37,11 @@ namespace LibraryCmd
             Console.WriteLine(dcn.CompareTo(dcn2));
             Console.WriteLine(dcn2.CompareTo(dcn));
 
-            /* Console.WriteLine(string.Compare(" ", "a"));
-            Console.WriteLine(string.Compare("a", "b"));
-            Console.WriteLine(string.Compare("a", "a"));
-            Console.WriteLine(string.Compare("a", " ")); */
+            var ac1 = new AlphaStringsCallNumber("Bio Sim");
+            var ac2 = new AlphaStringsCallNumber("Bio sim J");
+            int comp = ac1.CompareTo(ac2);
+            Console.WriteLine("Comparison (should be -1): " + ac1.cnStr + ", " 
+                              + ac2.cnStr + ": " + comp.ToString());
 
             // test out string indexing
             string mystr = "hello there";
@@ -48,6 +49,7 @@ namespace LibraryCmd
 
             bookshelfTest1();
 
+            Console.WriteLine("Hit enter to finish.");
             Console.Read(); // stop it from closing.
         }
     }

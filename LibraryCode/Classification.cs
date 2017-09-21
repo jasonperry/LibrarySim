@@ -6,60 +6,13 @@ using System.Threading.Tasks;
 
 namespace LibraryCode
 {
-    // new try
-    /* public abstract class CallNumber
-    {
-        public static bool operator <=(CallNumber n1, CallNumber n2)
-        {
-            return leq(n1, n2);
-        }
-        public static bool operator >=(CallNumber n1, CallNumber n2)
-        {
-            return !leq(n1, n2);
-        }
-        // can't be abstract. Oh well.
-        public static bool leq(CallNumber n1, CallNumber n2)
-        {
-            return false;
-        }
-    } */
-    /*    public interface IClassification : IComparable
-    //public interface IClassification<TCallNum>: IComparable<TCallNum> // interface inheritance! Ha!
-    {
-        List<string> subject();
-        // Can't declare operators in interfaces :(
-        //public static bool operator <= (TCallNum c1, TCallNum c2);
 
-        // if explicitly implemented it's private! Can only call after
-        //   casting to an interface object.
-
-        // no visibility modifier in interfaces?
-        //int CompareTo(TCallNum other);
-    } */
     public class CallNumberException : Exception
     {
         public CallNumberException(string message) : base(message)
         { }
     }
 
-    // MAYBE GIVE UP AND JUST HAVE A SINGLE CLASS WITH A 'CN TYPE' ENUM FIELD,
-    //  AND ONLY COMPARE IF THEY MATCH.
-    // ...but before that, try something with just interfaces?
-    // Yes! interfaces can also have type parameters! Think of how that might help!
-    //   can I pass an interface the class name itself?
-    //  then do Bookshelf<T> where T : IClassification<T>
-    //   or Bookshelf<T,U> where T: IClassification<U>  nah.
-
-    // can to generic methods with type constraints, and 'naked' constraints
-
-    // self-referenceing generic declarations:
-    // public interface IClassification<T> ...
-    // public class DeweyDecimalCN : IClassification<DeweyDecimalCN>
-
-    // Curiously Recurring Template Pattern.
-    // http://stackoverflow.com/questions/2032636/how-to-make-an-abstract-base-class-icomparable-that-doesnt-compare-two-separate
-
-    // any 'where' constraints needed
     public abstract class CallNumber// <Derived> //: IClassification
     {
         public CallNumber(string cnStr) { this.cnStr = cnStr; }
@@ -179,10 +132,24 @@ namespace LibraryCode
 
         public AlphaStringsCallNumber(String cnStr): base(cnStr) {
             // TODO: split by whitespace and store in the list
+            var wspace = new char[] {' ', '\t', '\n'};
+            var sarray = (cnStr.ToLower().Split(wspace, StringSplitOptions.RemoveEmptyEntries));
+            if (sarray.Length == 0) {
+                throw new CallNumberException("Empty alphabetic call number");
+            }
+            cnStrings = new List<string> (sarray); 
         }
 
-        public override int CompareTo(CallNumber obj) {
-            throw new NotImplementedException();
+        public override int CompareTo(CallNumber other) {
+            var alphOther = (AlphaStringsCallNumber) other;
+            for (int i=0; i < this.cnStrings.Count; i++) {
+                if (alphOther.cnStrings.Count == i) return 1; // this is longer
+                int comp = this.cnStrings[i].CompareTo(alphOther.cnStrings[i]);
+                if (comp != 0) return comp;
+            }
+            // Only possibility is other is longer (thus greater) or they're equal.
+            if (alphOther.cnStrings.Count > this.cnStrings.Count) return -1;
+            return 0; // equal
         }
 
         public override List<string> subject()
@@ -192,3 +159,56 @@ namespace LibraryCode
     }
 
 }
+
+/***********************************************
+  failed tries
+  ********************************************** */
+    // new try
+    /* public abstract class CallNumber
+    {
+        public static bool operator <=(CallNumber n1, CallNumber n2)
+        {
+            return leq(n1, n2);
+        }
+        public static bool operator >=(CallNumber n1, CallNumber n2)
+        {
+            return !leq(n1, n2);
+        }
+        // can't be abstract. Oh well.
+        public static bool leq(CallNumber n1, CallNumber n2)
+        {
+            return false;
+        }
+    } */
+    /*    public interface IClassification : IComparable
+    //public interface IClassification<TCallNum>: IComparable<TCallNum> // interface inheritance! Ha!
+    {
+        List<string> subject();
+        // Can't declare operators in interfaces :(
+        //public static bool operator <= (TCallNum c1, TCallNum c2);
+
+        // if explicitly implemented it's private! Can only call after
+        //   casting to an interface object.
+
+        // no visibility modifier in interfaces?
+        //int CompareTo(TCallNum other);
+    } */
+
+    // MAYBE GIVE UP AND JUST HAVE A SINGLE CLASS WITH A 'CN TYPE' ENUM FIELD,
+    //  AND ONLY COMPARE IF THEY MATCH.
+    // ...but before that, try something with just interfaces?
+    // Yes! interfaces can also have type parameters! Think of how that might help!
+    //   can I pass an interface the class name itself?
+    //  then do Bookshelf<T> where T : IClassification<T>
+    //   or Bookshelf<T,U> where T: IClassification<U>  nah.
+
+    // can to generic methods with type constraints, and 'naked' constraints
+
+    // self-referenceing generic declarations:
+    // public interface IClassification<T> ...
+    // public class DeweyDecimalCN : IClassification<DeweyDecimalCN>
+
+    // Curiously Recurring Template Pattern.
+    // http://stackoverflow.com/questions/2032636/how-to-make-an-abstract-base-class-icomparable-that-doesnt-compare-two-separate
+
+    // any 'where' constraints needed
