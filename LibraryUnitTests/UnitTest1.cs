@@ -5,14 +5,14 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace LibraryUnitTests
 {
     [TestClass]
-    public class UnitTest1
+    public class TestBookCase
     {
         string[] goodDeweyCallNums = { "001", "815.1", "313.627", "510 Boof",
                                        "551.82 Smit", "001.525 C Shar"};
         string[] badDeweyCallNums = { "foo", "001.343Faar", "HQ75.34 B222" };
 
         [TestMethod]
-        public void TestMakeBookshelf()
+        public void TestMakeBookcase()
         {
             var bookcase1 = new Bookcase<DeweyCallNumber>(4, 1000, 300, 400);
         }
@@ -31,6 +31,18 @@ namespace LibraryUnitTests
             // Compare a bunch of Dewey call numbers.
 
 
+        }
+    }
+
+    [TestClass]
+    public class TestCallNumbers
+    {
+        [TestMethod]
+        public void TestAlphaCallNum() {
+            var cn1 = new AlphaStringsCallNumber("Bio Smi");
+            var cn2 = new AlphaStringsCallNumber("Bio Smi J");
+            int comp = cn1.CompareTo(cn2);
+            Assert.AreEqual(comp, -1, "AlphaStringsCallNumber comparison fail")
         }
     }
 }
