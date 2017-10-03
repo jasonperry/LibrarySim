@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace BuildCat
 {
     /** Class for reading and translating MarcXML data */
-    class MarcXML
+    public class MarcXML
     {
         // gettable properties for the fields.
 

@@ -42,7 +42,7 @@ namespace LibraryUnitTests
             var cn1 = new AlphaStringsCallNumber("Bio Smi");
             var cn2 = new AlphaStringsCallNumber("Bio Smi J");
             int comp = cn1.CompareTo(cn2);
-            Assert.AreEqual(comp, -1, "AlphaStringsCallNumber comparison fail")
+            Assert.AreEqual(comp, -1, "AlphaStringsCallNumber comparison fail");
         }
     }
 }
