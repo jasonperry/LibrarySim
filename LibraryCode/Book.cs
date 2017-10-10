@@ -9,8 +9,8 @@ namespace LibraryCode
     /** A book. */
     public class Book  //<DeweyCallNumber>, IComparable<LOCCallNumber>
     {
-        public int length { get; }
         public int width { get; }
+        public int depth { get; } // across the cover.
         public int height { get; }
         // can have multiple classifications, but comparisons need to be explicitly
         //  implemented
@@ -19,10 +19,10 @@ namespace LibraryCode
         // TODO: properly represented MARC or BibFrame fields.
         // A nested struct for that, which is passed into the constructor.
         // And a pointer to the location of the book files
-        public Book(int length, int width, int height, CallNumber callNumber)
+        public Book(int width, int depth, int height, CallNumber callNumber)
         {
-            this.length = length;
             this.width = width;
+            this.depth = depth;
             this.height = height;
             callNumbers.Add(callNumber);
         }
@@ -30,34 +30,32 @@ namespace LibraryCode
         /** Get call number of type determined by type parameter. */
         public CallNumber getCN<TCallNum>()
         {
-            foreach(CallNumber cn in callNumbers)
-            {
-                if (cn.GetType() == typeof(TCallNum))
-                {
+            foreach(CallNumber cn in callNumbers) {
+                if (cn.GetType() == typeof(TCallNum)) {
                     return cn;
                 }
             }
             throw new CallNumberException("Book does not have Call Number of given type");
         }
 
+        /** Get the Dewey Decimal call number. */
         public DeweyCallNumber getDDC()
         {
             foreach (CallNumber cn in callNumbers)
             {
-                if (cn.GetType() == typeof(DeweyCallNumber))
-                {
+                if (cn.GetType() == typeof(DeweyCallNumber)) {
                     return (DeweyCallNumber) cn;
                 }
             }
             throw new CallNumberException("Book does not have Dewey Call Number");
         }
 
+        /** Get the Library of Congress Call number */
         public LOCCallNumber getLOC()
         {
             foreach (CallNumber cn in callNumbers)
             {
-                if (cn.GetType() == typeof(LOCCallNumber))
-                {
+                if (cn.GetType() == typeof(LOCCallNumber)) {
                     return (LOCCallNumber)cn;
                 }
             }

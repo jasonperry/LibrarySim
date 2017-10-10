@@ -47,7 +47,7 @@
       <DependentUpon>MARC21slim.xsd</DependentUpon>
     </Compile>
     <Compile Include="MarcXML.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="BuildCat.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

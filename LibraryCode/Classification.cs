@@ -34,12 +34,10 @@ namespace LibraryCode
         {
             // This will call the subclass method when overridden.
             return c1.CompareTo(c2) <= 0;
-
         }
         public static bool operator >=(CallNumber c1, CallNumber c2)
         {
             return c1.CompareTo(c2) >= 0;
-
         }
 
     }  
