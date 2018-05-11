@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+    <Compile Include="CallNumber.fs" />
+    <Compile Include="BookRecord.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RDFSharp" Version="1.0.1" />
+  </ItemGroup>
+
+</Project>
