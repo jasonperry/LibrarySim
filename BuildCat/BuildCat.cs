@@ -9,6 +9,8 @@ using LibraryCode;
 
 namespace BuildCat
 {
+    /** Command-line utility to create a book catalog from data files
+     *  (starting with MarcXML). */
     class Program
     {
         static recordType ProcessMarcXMLFile(string filePath)
@@ -98,17 +100,14 @@ namespace BuildCat
                 int filesFound = 0;
                 int filesSuccess = 0;
                 foreach (string fileName in fileEntries) { 
-                    if (fileName.EndsWith(".xml"))
-                    {
+                    if (fileName.EndsWith(".xml")) {
                         filesFound++;
                         var record = ProcessMarcXMLFile(fileName);
-                        if (record != null)
-                        {
+                        if (record != null) {
                             filesSuccess++;
                             PrintMarcXML(record);
                         }
-                        else
-                        {
+                        else {
                             Console.WriteLine("Processing file {0} failed.",
                                               fileName);
                         }

@@ -158,7 +158,9 @@ namespace LibraryCode
 
         public override List<string> subject()
         {
-            throw new NotImplementedException();
+            // An AlphaCN might not have a known subject.
+            // throw new NotImplementedException();
+            return new List<string>();
         }
     }
 
