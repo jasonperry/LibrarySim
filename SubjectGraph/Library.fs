@@ -1,6 +1,8 @@
 /// Constructing and querying a graph of LOC Subject Headings.
 module SubjectGraph
 
+open BookRecord
+
 open System         (* console *)
 open System.Net     (* for HTTP requests *)
 open System.Web
@@ -9,7 +11,7 @@ open System.Xml.Linq
 open System.Collections.Generic (* Dictionary, Mutable List *)
 // open RDFSharp.Model
 
-(* TODO: read this from an .ini file *)
+(* TODO: read this from an .ini file THAT ISN'T SOURCE CONTROLLED! *)
 let endpoint = "http://35.202.98.137:3030/locsh"
 
 // Used by all the functions that construct queries.
@@ -221,14 +223,15 @@ let browseGraph (graph : SubjectGraph) =
     (* Might like to print out some level info. *)
     (* Should also be getting the book count underneath and skipping if there's just one 
        (to avoid long single chains) *)
-    printfn "*** Top Level Subjects ***"
+    printfn "*** Top Level Subjects ***" (* Shouldn't be here... *)
     (* letrec is preferable to a while loop and mutable variable? *)
     let rec loop (currentList : List<SubjectNode>) = 
-        (* When I go up, construct mutable list *)
-        let mutable count = 0
+        (* When I go up, construct mutable list.. why not make an immutable list? *)
+        List.iteri (fun i node -> printf "| %d. %s " i node.name) (List.ofSeq currentList)
+        (*let mutable count = 0
         for node in currentList do 
             printf "| %d. %s " count node.name
-            count <- count + 1
+            count <- count + 1 *)
         printf "\n Enter an index, 'u' to go up, or 'q' to quit: "
         let input = Console.ReadLine()
         let (|NumOpt|CharOpt|Fail|) (input : string) = 
@@ -264,6 +267,8 @@ let browseGraph (graph : SubjectGraph) =
         (* active pattern to match and interpret? *)
     loop graph.topLevel
         
+/// Add a book's subjects to a graph (and add the book too?)
+let addBookSubjects (graph : SubjectGraph) (book : BookRecord) = None
 
 // Maybe I won't need to use the RDF library at all. 
 (*
