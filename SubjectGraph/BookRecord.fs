@@ -8,6 +8,3 @@ type BookRecord = {
     LCCall : LCCN option
     Subjects: string list
 }
-
-/// Parse a Project Gutenberg RDF. TODO: move into a script. 
-let gutenRDFtoBook rdfRecord = ""

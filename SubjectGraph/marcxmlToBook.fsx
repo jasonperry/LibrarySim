@@ -3,8 +3,9 @@
 #load "CallNumber.fs"
 #load "BookRecord.fs"
 open BookRecord
+open CallNumber
 open System.Collections.Generic (* Always need this for lists. *)
-open System.IO (* for file read *)
+open System.IO (* for file read and write *)
 open FSharp.Data
 
 let xmlfile = fsi.CommandLineArgs.[1]
@@ -33,6 +34,7 @@ let processRecords (data : Marc21Slim.Collection) =
     let books = new List<BookRecord>()
     let mutable totalRecords = 0
     let mutable withCallNum = 0
+    let mutable withDeweyNum = 0
     let mutable withSubjects = 0
     for record in data.Records do
         printfn "------------"
@@ -50,24 +52,48 @@ let processRecords (data : Marc21Slim.Collection) =
                 printfn "Primary author found" (* TODO: dig out more authors *)
                 authors <- getSubfieldString datafield "a"
                 printfn ": %A" authors
-            elif datafield.Tag = 650 then // can be multiples of these
-                let subjTopic = getSubfieldString datafield "a"
-                subjects.Add(subjTopic.Value)
+            (* 150 is the topic heading for Marc21 Full. 
+             * The gutenberg converter uses 653 *)
+            elif datafield.Tag = 650 || datafield.Tag = 653 then // can be multiples of these
+                let subjTopic = (getSubfieldString datafield "a")
+                                    .Value
+                                    .Replace(" -- ", "--")
+                printfn ": %s" subjTopic
+                subjects.Add(subjTopic)
             elif datafield.Tag = 50 then
                 let cn = getSubfieldString datafield "a"
                 printfn "Call Number: %s" cn.Value
+                (* lcCallNum <- Some (LCCN.Parse cn.Value) // guten CN's are bad *)
                 withCallNum <- withCallNum + 1
-        printfn "Subjects: %A" subjects
+            elif datafield.Tag = 82 then
+                let dcn = getSubfieldString datafield "a"
+                printfn "Dewey Call number: %s" dcn.Value
+                withDeweyNum <- withDeweyNum + 1
+        // printfn "Subjects: %A" subjects
         totalRecords <- totalRecords + 1
         if subjects.Count > 0 then
             withSubjects <- withSubjects + 1
-    printfn "Processed %d records, %d with call numbers, %d with subjects" 
+            books.Add({
+                        Title = title.Value;
+                        Authors = if authors.IsSome then authors.Value else "" ;
+                        LCCall = None;
+                        Subjects = List.ofSeq(subjects)
+            })
+            // For now, only books with subjects.
+    printfn "Processed %d records, %d with call numbers, %d with subjects," 
             totalRecords withCallNum withSubjects
+    printfn "    %d with Dewey call numbers" withDeweyNum
+    printfn "Generated %d book records" books.Count
     books
 
+let allbooks = processRecords (Marc21Slim.Parse (File.ReadAllText xmlfile))
 
+/// save books out to disk
+open System.Runtime.Serialization.Formatters.Binary
 
-processRecords (Marc21Slim.Parse (File.ReadAllText xmlfile))
-
+let formatter = BinaryFormatter()
+let stream = new FileStream("records.brb", FileMode.Create)
+formatter.Serialize(stream, allbooks)
+stream.Close()
         (* printfn "Found tag %d" datafield.Tag *)
 // printfn "%A" (data.GetSample().Values)

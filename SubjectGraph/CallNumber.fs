@@ -6,10 +6,17 @@ open System
 exception BadCallNumberException of string
 
 (* BEST REGEX EVER *)
+(* ISSUE: Some Gutenberg records have ONLY the letters. Is that a valid CN? *)
 (* Still to check: how many digits can cutter numbers and decimals have? *)
 (* To fix: 1st cutter can be something besides letter + digits *)
-(* groups: 1: letters, 2: number, 3:  decimal 4: rest1, 5: cutter1, 6: cutter2, 7: space+year *)
-let LCCN_REGEX = @"^([A-Z]{1,3}) ?([0-9]{1,5})(\.[0-9]{1,4})? ?((\.[A-Z][0-9]{1,5}) ?([A-Z][0-9]{1,4})?)?( [0-9]{1,4}[a-z]?)?$"
+(* groups: 1: letters, 2: number, 3: decimal 4: rest1, 5: cutter1, 6: cutter2, 7: space+year *)
+let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
+                 + " ?([0-9]{1,5})"         // g2: number
+                 + "(\.[0-9]{1,4})? ?"      // g3: decimal
+                 + "((\.[A-Z][0-9]{1,5})"   // g4: rest, g5: cutter1
+                 + " ?([A-Z][0-9]{1,4})?)?" // g6: cutter2
+                 + "( [0-9]{4}[a-z]?)?"     // g7: year
+                 + "( [Vv]\.[0-9]+| [Cc]\.[0-9]+| [Pp]t\.[0-9]+| suppl.)?$" // g8: misc
 
 let applyOption x someFn noThing = 
     match x with
@@ -26,6 +33,7 @@ type LCCN = {
     cutter1 : (char * int) option;
     cutter2 : (char * int) option;
     date : string option; (* because of "2000b", etc. Lexicographic sorting should work? *)
+    misc : string option; (* "v.1", "c.2", "suppl.", "Pt.1" *)
 } with
     member this.Show () = (* might like to try monadic stuff with this too *)
         this.letters + string this.number
@@ -49,7 +57,9 @@ type LCCN = {
                 cutter2 = if groups.[6] = "" then None 
                           else Some (groups.[6].[0], int (groups.[6].[1..]));
                 date = if groups.[7] = "" then None 
-                          else Some (groups.[7].[1..]) (* Skip initial space *)
+                       else Some (groups.[7].[1..]) (* Skip initial space *)
+                misc = if groups.[8] = "" then None
+                       else Some (groups.[8].[1..]) 
             }
         else raise (BadCallNumberException "Could not parse LOC Call Number")
     (* TODO: compare if one CN is a more specific version of another? *)

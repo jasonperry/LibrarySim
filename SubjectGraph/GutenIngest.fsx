@@ -1,3 +1,4 @@
+/// Currently useless--doing everything through MarcXML. 
 #r "RDFSharp.dll"
 #load "CallNumber.fs"
 #load "BookRecord.fs"

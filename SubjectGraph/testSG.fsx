@@ -4,7 +4,9 @@
 #load "Library.fs"
 open SubjectGraph
 
-let subjs = ["Baseball"; "Basketball"; "Volleyball"]
+// just change this and try.
+//let subjs = ["Baseball"; "Basketball"; "Volleyball"]
+let subjs = ["Presidents--United States--Inaugural addresses"]
 
 List.map (addSubject theGraph) subjs |> ignore
 
