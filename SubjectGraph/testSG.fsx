@@ -11,5 +11,3 @@ let subjs = ["Presidents--United States--Inaugural addresses"]
 List.map (addSubject theGraph) subjs |> ignore
 
 browseGraph theGraph
-
-let _ = 42

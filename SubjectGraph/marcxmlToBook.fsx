@@ -9,6 +9,7 @@ open System.IO (* for file read and write *)
 open FSharp.Data
 
 let xmlfile = fsi.CommandLineArgs.[1]
+let recordsFileName = "records.brb"
 
 /// Giving a constant file name initializes the type provider magic.
 type Marc21Slim = XmlProvider<"marcsample.xml"> 
@@ -39,15 +40,18 @@ let processRecords (data : Marc21Slim.Collection) =
     for record in data.Records do
         printfn "------------"
         let mutable title = None
+        let mutable subtitle = None
         let mutable authors = None (* Optional *)
         let mutable lcCallNum = None
+        let mutable lcLetters = None
         let subjects = new List<string>()
         for datafield in record.Datafields do
             printfn "Tag %d" datafield.Tag
             if datafield.Tag = 245 then
                 printfn "Title Statement found"
                 title <- getSubfieldString datafield "a"
-                printfn ": %A" title
+                subtitle <- getSubfieldString datafield "b"
+                printfn ": %A (%A)" title subtitle
             elif datafield.Tag = 100 then
                 printfn "Primary author found" (* TODO: dig out more authors *)
                 authors <- getSubfieldString datafield "a"
@@ -61,9 +65,17 @@ let processRecords (data : Marc21Slim.Collection) =
                 printfn ": %s" subjTopic
                 subjects.Add(subjTopic)
             elif datafield.Tag = 50 then
-                let cn = getSubfieldString datafield "a"
-                printfn "Call Number: %s" cn.Value
-                (* lcCallNum <- Some (LCCN.Parse cn.Value) // guten CN's are bad *)
+                let cn = (getSubfieldString datafield "a").Value
+                printfn "Call Number: %s" cn
+                try 
+                    lcCallNum <- Some (LCCN.Parse cn)
+                    lcLetters <- Some (lcCallNum.Value.letters)
+                with 
+                    // If the call number is letters (gutenberg), detect and store.
+                    | BadCallNumberException es -> 
+                        if isCNLetters cn then 
+                            lcLetters <- Some cn
+                        else printfn "(!!) %s" es
                 withCallNum <- withCallNum + 1
             elif datafield.Tag = 82 then
                 let dcn = getSubfieldString datafield "a"
@@ -74,13 +86,15 @@ let processRecords (data : Marc21Slim.Collection) =
         if subjects.Count > 0 then
             withSubjects <- withSubjects + 1
             books.Add({
-                        Title = title.Value;
+                        Title = title.Value + 
+                                if subtitle.IsSome then (" " + subtitle.Value) else "";
                         Authors = if authors.IsSome then authors.Value else "" ;
-                        LCCall = None;
+                        LCCallNum = None;
+                        LCLetters = None;
                         Subjects = List.ofSeq(subjects)
             })
             // For now, only books with subjects.
-    printfn "Processed %d records, %d with call numbers, %d with subjects," 
+    printfn "Processed %d records, %d call numbers, %d subjects," 
             totalRecords withCallNum withSubjects
     printfn "    %d with Dewey call numbers" withDeweyNum
     printfn "Generated %d book records" books.Count
@@ -88,12 +102,13 @@ let processRecords (data : Marc21Slim.Collection) =
 
 let allbooks = processRecords (Marc21Slim.Parse (File.ReadAllText xmlfile))
 
-/// save books out to disk
+/// save list of book records to disk
 open System.Runtime.Serialization.Formatters.Binary
 
 let formatter = BinaryFormatter()
-let stream = new FileStream("records.brb", FileMode.Create)
+let stream = new FileStream(recordsFileName, FileMode.Create)
 formatter.Serialize(stream, allbooks)
 stream.Close()
+printfn "Wrote records to file %s" recordsFileName
         (* printfn "Found tag %d" datafield.Tag *)
 // printfn "%A" (data.GetSample().Values)

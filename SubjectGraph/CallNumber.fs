@@ -18,6 +18,17 @@ let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                  + "( [0-9]{4}[a-z]?)?"     // g7: year
                  + "( [Vv]\.[0-9]+| [Cc]\.[0-9]+| [Pp]t\.[0-9]+| suppl.)?$" // g8: misc
 
+// If a string doesn't parse as LCCN, see if it looks like just the letters part (gutenberg)
+let isCNLetters s = 
+    let isAlpha c = 'A' <= c && c <= 'z'
+    String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
+
+let topCallLetters = Map.ofList [
+    ("A", "General Works");
+    ("B", "Philosophy. Psychology. Religion");
+    ("C", "Auxiliary Sciences of History");    
+]
+
 let applyOption x someFn noThing = 
     match x with
         | Some v -> someFn v

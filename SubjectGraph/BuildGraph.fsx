@@ -10,10 +10,12 @@ open System.Collections.Generic (* Always need this for lists. *)
 open System.Runtime.Serialization.Formatters.Binary
 open BookRecord
 
+let graphFileName = "graph.sgb"
+
 let booklist = 
     let booksFormatter = BinaryFormatter()
     let stream = new FileStream("records.brb", FileMode.Open)
-    let bl = booksFormatter.Deserialize(stream)
+    let bl = booksFormatter.Deserialize(stream) // has type 'obj'
     stream.Close()
     bl :?> List<BookRecord> 
 
@@ -24,14 +26,16 @@ let success = Seq.mapi (fun i book -> // try
                             addBookSubjects theGraph true book) 
                         booklist
 
+printfn "Processed %d books, generating %d subject headings" 
+        booklist.Count theGraph.subjectUriIndex.Count
 printfn "%d books not added (no subject found)" 
         <| Seq.length (Seq.filter (not) success)
 
 // write to disk.
 let graphFormatter = BinaryFormatter()
-let stream = new FileStream("graph.sgb", FileMode.Create)
+let stream = new FileStream(graphFileName, FileMode.Create)
 graphFormatter.Serialize(stream, theGraph)
 stream.Close()
 
-printfn "Added %d books to graph, generating %d subject headings" 
-        booklist.Count theGraph.subjectUriIndex.Count
+printfn "Wrote subject graph file to %s" graphFileName
+

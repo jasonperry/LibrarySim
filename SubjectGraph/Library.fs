@@ -33,7 +33,6 @@ module Logger =
             printfn "[ERROR] %s" s
 
 
-
 (* TODO: read this from an .ini file THAT ISN'T SOURCE CONTROLLED! *)
 let endpoint = "http://35.202.98.137:3030/locsh"
 
@@ -95,7 +94,7 @@ let sparqlQuery (queryString : string) =
 (* ***************************************************************** *)
 type SubjectNode = {
     uri : string;
-    name : string; // TODO: add variant names to subjectNameIndex *)
+    name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
     callNumRange : string option
     (* no explicit refs needed for these, F# uses reference semantics *)
     (* It's kind of ingenious that the upwards are immutable and the downwards aren't. *)
@@ -108,10 +107,10 @@ type SubjectNode = {
 
 /// Structures are mutable for a more update-based process
 /// (and to avoid duplicating the whole thing.)
-/// But now I have to initialize it.
+/// But then we have to initialize it.
 type SubjectGraph = {
-    topLevel : List<SubjectNode>; // maybe this should be immutable
-    // went back to immutable lists. Even broader's won't actually be added twice.
+    topLevel : List<SubjectNode>; 
+    // went back to immutable lists. Even broaders won't actually be added twice.
     cnIndex : Dictionary<string, SubjectNode list>;  (* maybe not unique *)
     subjectNameIndex : Dictionary<string, SubjectNode list>;
     (* should be unique...hashset? *)
@@ -121,14 +120,24 @@ type SubjectGraph = {
 /// For now, have a single graph for the module.
 let theGraph = { 
     // TODO: change to have a top node instead of a top level.
-    topLevel = new List<_> ();
+    topLevel = new List<_> (); // Later: read from pre-generated list.
     cnIndex = new Dictionary<_,_> ();
     subjectNameIndex = new Dictionary<_,_> ();
     subjectUriIndex = new Dictionary<_,_> ()
 }
 
 (* ***************************************************************** *)
+
+// maybe this function should just read the file and have it ready,
+// because we only add if it matches a book.
+let buildTopLevelLOC = None
+    // read in LCC subjects from file (into map?)
+    // look it up.
+
 let getVariantLabels subj = []
+
+// Get a broader topic (probably only one) based on LCC.
+let getBroaderLCC callNum = []
 
 let getBroaderTerms (subj : BasicUri) = 
     let queryString = 
@@ -182,7 +191,10 @@ let pullSubjectData (label: string) =
     printfn "%s" queryString           
     (sparqlQuery queryString).results.[0].["subj"] // stopgap *)
 
-/// Try to find a topic heading for a complex subject. Maybe still a good idea to implement!
+/// Try to find a topic heading for a complex subject. 
+/// Probably by splitting it by the -- separators. But how to tell which one
+///   is the 'fundamental' subject?
+/// Maybe still a good idea to implement!
 let topicForComplexSubject subjectString = None
 
 // ** Broad directives **     
@@ -194,7 +206,7 @@ let topicForComplexSubject subjectString = None
 
 /// Add a heading record and all its broader subjects to the graph.
 /// Modifies the graph and returns a node option with the new or found node.
-let rec addSubject graph (label: string) = // need based on CN as well as label?
+let rec addSubject graph (label: string) (callLetters : string option) = 
     (* TODO: Sanitize label? Or does Jena already do it? *)
     let label = label.Replace("\"", "\\\"")
     let qres = pullSubjectData label (* Is querying twice going on? *)
@@ -211,10 +223,12 @@ let rec addSubject graph (label: string) = // need based on CN as well as label?
             Logger.Warning (sprintf "Multiple results for \"%s\", taking only first" label)
         let res = qres.results.[0]
         let subj = res.["subj"]
-        // idea: broader immutable, narrower mutable. 
+        // idea: broader immutable, narrower mutable.
+        // NEW: If "have a call number" = getBroaderLOC else ...
+        //   so it will keep going until we have a call number!
         let broaderSubjects = getBroaderTerms (Uri subj)
-        // Filter the data - (>>) is "after", like (o). 
-        let broaderNodes = List.map (snd >> addSubject graph) broaderSubjects 
+        // Recursively add the broader subjects. 
+        let broaderNodes = List.map (fun br -> addSubject graph (snd br) callLetters) broaderSubjects 
                            |> List.choose id  // filters out empties.
         // LATER: if a "broader" jumps out of the call number range or doesn't have one,
         //  add the call number topic as a parent (will need to pass call number up.)  
@@ -275,11 +289,12 @@ let browseGraph (graph : SubjectGraph) =
     (* letrec is preferable to a while loop and mutable variable? *)
     let rec loop (currentList : List<SubjectNode>) = 
         // When I go up, construct mutable list.. why not make an immutable list?
-        List.iteri (fun i node -> printf "| %d. %s " i node.name) (List.ofSeq currentList)
-        (*let mutable count = 0
-        for node in currentList do 
-            printf "| %d. %s " count node.name
-            count <- count + 1 *)
+        List.iteri (fun i node -> 
+                        printf "| %d. %s " i node.name
+                        if node.booksUnder > 0 then
+                            printf "(%d)" node.booksUnder
+                   ) 
+                   (List.ofSeq currentList)
         printf "\n Enter an index, 'u' to go up, 't' to top, or 'q' to quit: "
         let input = Console.ReadLine()
         let (|NumOpt|CharOpt|Fail|) (input : string) = 
@@ -324,17 +339,22 @@ let browseGraph (graph : SubjectGraph) =
         
 /// Add a book's subjects to a graph (and add the book too?)
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
-    (* for each subject, add it, get node back *) 
-    // need some logic: If at least one doesn't have broader...do something.
-    let nodes = List.map (fun subj -> addSubject graph subj) book.Subjects
+    // for each subject, add it, get node back 
+    let nodes = List.map (fun subj -> addSubject graph subj book.LCLetters) book.Subjects
                 |> List.choose id
+    // If we're storing books too, add it and update the counts
     if addBook then
-        List.iter (fun node -> node.books.Add(book)) nodes
+        let rec updateCounts node = 
+            node.booksUnder <- node.booksUnder + 1
+            List.iter updateCounts node.broader
+        List.iter (
+            fun node -> node.books.Add(book)
+                        updateCounts node
+            ) nodes
     if nodes.IsEmpty then
         Logger.Alert (sprintf "No subject found for \"%s\"; book not added" book.Title)
         false
     else true
-    // graph 
 
 // Maybe I won't need to use the RDF library at all. 
 (*

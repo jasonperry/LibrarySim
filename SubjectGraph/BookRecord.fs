@@ -5,6 +5,7 @@ open CallNumber
 type BookRecord = {
     Title: string
     Authors: string
-    LCCall : LCCN option
+    LCCallNum : LCCN option
+    LCLetters: string option
     Subjects: string list
 }
