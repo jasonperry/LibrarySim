@@ -2,15 +2,17 @@
 #r "System.Xml.Linq.dll"
 #load "CallNumber.fs"
 #load "BookRecord.fs"
+#load "SparqlQuery.fs"
 #load "Library.fs"
 
-open System.IO (* for file read and write *)
+open System.IO // for file read and write 
 open SubjectGraph
 open System.Collections.Generic (* Always need this for lists. *)
 open System.Runtime.Serialization.Formatters.Binary
 open BookRecord
 
 let graphFileName = "graph.sgb"
+let theGraph = emptyGraph()
 
 let booklist = 
     let booksFormatter = BinaryFormatter()

@@ -4,6 +4,7 @@
 
 #load "CallNumber.fs"
 #load "BookRecord.fs"
+#load "SparqlQuery.fs"
 #load "Library.fs"
 
 open System.Runtime.Serialization.Formatters.Binary
@@ -18,6 +19,6 @@ let graph =
     let stream = new FileStream(graphFileName, FileMode.Open)
     let bl = booksFormatter.Deserialize(stream)
     stream.Close()
-    bl :?> SubjectGraph
+    bl :?> SubjectGraph.SubjectGraph
 
 browseGraph graph

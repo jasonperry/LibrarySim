@@ -4,13 +4,12 @@ module SubjectGraph
 open BookRecord
 
 open System         (* console *)
-open System.Net     (* for HTTP requests *)
-open System.Web
-open System.IO      (* StreamReader *)
-open System.Xml.Linq
 open System.Collections.Generic (* Dictionary, Mutable List *)
+open SparqlQuery
+
 // open RDFSharp.Model
 
+// Beginning of a logging framework. TODO: move to its own module
 // If a module is a singleton, this is good, right?
 module Logger = 
     type LogLevel = DEBUG | INFO | WARNING | ALERT | ERROR
@@ -33,92 +32,49 @@ module Logger =
             printfn "[ERROR] %s" s
 
 
-(* TODO: read this from an .ini file THAT ISN'T SOURCE CONTROLLED! *)
-let endpoint = "http://35.202.98.137:3030/locsh"
-
-// Used by all the functions that construct queries.
-let queryPrefix = "PREFIX madsrdf: <http://www.loc.gov/mads/rdf/v1#>\n"
-                  + "PREFIX lcsh: <http://id.loc.gov/authorities/subjects/>\n"
-                  + "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"
-
 /// A lightweight URI wrapper to differentiate from strings. 
 /// Hope the constructor won't interfere with other library code.
 type BasicUri = Uri of string
     with member this.Value = match this with (Uri s) -> s
          member this.Wrapped = match this with (Uri s) -> "<" + s + ">"
 
-(* TODO: Move SPARQL stuff into its own module. *)
-(* ***************************************************************** *)
-
-/// Type to store result of a SPARQL query as a list of (variable, value) maps.
-/// Should work for any SELECT query.
-type SparqlResult = {
-    vars: string list;
-    results: Map<string, string> list; 
-} with 
-    static member FromXml xmlstr = 
-        let xname = XName.Get
-        let srname name = XName.Get ("{http://www.w3.org/2005/sparql-results#}" + name)
-        let doc = XElement.Parse xmlstr
-        let varlist = (doc.Element (srname "head")).Elements (srname "variable")
-                      |> List.ofSeq
-        let resultlist = (doc.Element (srname "results")).Elements(srname "result")
-                         |> List.ofSeq
-        { 
-            (* need to throw errors here? Should just return null or empty. *)
-            vars = List.map 
-                    (fun (elt: XElement) -> (elt.Attribute (xname "name")).Value) 
-                    varlist
-            (* Create a map for all the bindings in each result. *)
-            results = List.map (fun (result: XElement) -> 
-                                Seq.map (fun (binding: XElement) -> 
-                                             ((binding.Attribute (xname "name")).Value,
-                                              binding.Value)) 
-                                        (result.Elements (srname "binding"))
-                                |> Map.ofSeq )
-                               resultlist 
-        }
-
-/// The boilerplate for sending a query.
-let sparqlQuery (queryString : string) = 
-    let url = endpoint + "?query=" + HttpUtility.UrlEncode(queryString)
-    let req = HttpWebRequest.Create(url) :?> HttpWebRequest
-    req.Method <- "GET" (* Probably the default. *)
-    req.ContentType <- "application/x-www-form-urlencoded"
-    let resp = req.GetResponse() :?> HttpWebResponse
-    let stream = resp.GetResponseStream ()
-    let reader = new StreamReader(stream) 
-    SparqlResult.FromXml (reader.ReadToEnd())
-    (* parse to list of results, each with dict of variables with list of bindings?*)
-
-(* ***************************************************************** *)
 type SubjectNode = {
-    uri : string;
+    uri : BasicUri;
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
     callNumRange : string option
-    (* no explicit refs needed for these, F# uses reference semantics *)
-    (* It's kind of ingenious that the upwards are immutable and the downwards aren't. *)
+    // no explicit refs needed for these, F# uses reference semantics 
+    // It's kind of ingenious that the upwards are immutable and the downwards aren't. 
     broader : SubjectNode list
-    narrower : List<SubjectNode> (* mutable; new parents not added,
-                                  * but children are *)
+    narrower : List<SubjectNode> // mutable; new parents not added, but children are
     books : List<BookRecord>
     mutable booksUnder : int  // to keep a count
 }
 
-/// Structures are mutable for a more update-based process
-/// (and to avoid duplicating the whole thing.)
-/// But then we have to initialize it.
+/// Switched to a class, so it's easy to initialize with ().
+(*
+type SubjectGraph() =
+    // Do I still want a single top node?
+    member sg.topLevel : List<SubjectNode> = new List<_>()
+    // May return multiple subjects for a call number.
+    member sg.cnIndex : Dictionary<string, SubjectNode list> = 
+        new Dictionary<_,_> ()
+    member sg.subjectNameIndex : Dictionary<string, SubjectNode list> = 
+        new Dictionary<_,_> ()
+    // Should be unique key....hashset?
+    member sg.subjectUriIndex : Dictionary<BasicUri, SubjectNode> =
+        new Dictionary<_,_> ()
+*)
+
 type SubjectGraph = {
     topLevel : List<SubjectNode>; 
     // went back to immutable lists. Even broaders won't actually be added twice.
-    cnIndex : Dictionary<string, SubjectNode list>;  (* maybe not unique *)
+    cnIndex : Dictionary<string, SubjectNode list>;  // maybe not unique 
     subjectNameIndex : Dictionary<string, SubjectNode list>;
-    (* should be unique...hashset? *)
-    subjectUriIndex : Dictionary<string, SubjectNode>; 
-}
+    // should be unique...hashset? Can we make out of BasicURI...yes.
+    subjectUriIndex : Dictionary<BasicUri, SubjectNode>; 
+} 
 
-/// For now, have a single graph for the module.
-let theGraph = { 
+let emptyGraph () =  { 
     // TODO: change to have a top node instead of a top level.
     topLevel = new List<_> (); // Later: read from pre-generated list.
     cnIndex = new Dictionary<_,_> ();
@@ -126,10 +82,18 @@ let theGraph = {
     subjectUriIndex = new Dictionary<_,_> ()
 }
 
+/// For now, have a single graph for the module.
+(* let theGraph = { 
+    // TODO: change to have a top node instead of a top level.
+    topLevel = new List<_> (); // Later: read from pre-generated list.
+    cnIndex = new Dictionary<_,_> ();
+    subjectNameIndex = new Dictionary<_,_> ();
+    subjectUriIndex = new Dictionary<_,_> ()
+} *)
+
 (* ***************************************************************** *)
 
-// maybe this function should just read the file and have it ready,
-// because we only add if it matches a book.
+// TODO: actually this will just read in a graph file outputted by a script.
 let buildTopLevelLOC = None
     // read in LCC subjects from file (into map?)
     // look it up.
@@ -138,6 +102,18 @@ let getVariantLabels subj = []
 
 // Get a broader topic (probably only one) based on LCC.
 let getBroaderLCC callNum = []
+
+// to determine if one topic is a broader version of another.
+let rec isBroaderThan (graph: SubjectGraph) (uri1: BasicUri) (uri2: BasicUri) = 
+    // ? should it accept a node? It should be one-to-one, but...
+    let (node1, node2) = graph.subjectUriIndex.[uri1], 
+                         graph.subjectUriIndex.[uri2]
+    if List.isEmpty (node2.broader) then
+        false
+    elif List.contains node1 node2.broader then
+        true
+    else 
+        List.exists (fun nd -> isBroaderThan graph uri1 nd.uri) node2.broader
 
 let getBroaderTerms (subj : BasicUri) = 
     let queryString = 
@@ -206,27 +182,28 @@ let topicForComplexSubject subjectString = None
 
 /// Add a heading record and all its broader subjects to the graph.
 /// Modifies the graph and returns a node option with the new or found node.
-let rec addSubject graph (label: string) (callLetters : string option) = 
-    (* TODO: Sanitize label? Or does Jena already do it? *)
+let rec addSubject (graph: SubjectGraph) (label: string) (callLetters : string option) = 
+    // TODO: Sanitize label? Or does Jena already do it? 
     let label = label.Replace("\"", "\\\"")
     let qres = pullSubjectData label (* Is querying twice going on? *)
     if qres.results.IsEmpty then 
         Logger.Warning ("Empty result for label: " + label)
+        // TODO: Add to set of un-found subjects, to examine later.
         None  
     // TODO: handle multiple results (multiple subjs with same name...)
-    elif graph.subjectUriIndex.ContainsKey (qres.results.[0].["subj"]) then
+    elif graph.subjectUriIndex.ContainsKey (Uri qres.results.[0].["subj"]) then
         // TODO: check if the label is already there too, and if not add it
-        Some graph.subjectUriIndex.[qres.results.[0].["subj"]]
+        Some graph.subjectUriIndex.[Uri qres.results.[0].["subj"]]
     else
         // Create new subject node.
         if qres.results.Length > 1 then
             Logger.Warning (sprintf "Multiple results for \"%s\", taking only first" label)
         let res = qres.results.[0]
-        let subj = res.["subj"]
+        let subj = Uri res.["subj"]
         // idea: broader immutable, narrower mutable.
         // NEW: If "have a call number" = getBroaderLOC else ...
         //   so it will keep going until we have a call number!
-        let broaderSubjects = getBroaderTerms (Uri subj)
+        let broaderSubjects = getBroaderTerms subj
         // Recursively add the broader subjects. 
         let broaderNodes = List.map (fun br -> addSubject graph (snd br) callLetters) broaderSubjects 
                            |> List.choose id  // filters out empties.
@@ -264,9 +241,10 @@ let rec addSubject graph (label: string) (callLetters : string option) =
         graph.subjectUriIndex.Add(newNode.uri, newNode)
         // If subject has a call number, add that to the index.
         if res.ContainsKey "callNum" then
-            if graph.cnIndex.ContainsKey "callNum" then
-                graph.cnIndex.["callNum"] <- newNode :: graph.cnIndex.["callNum"]
-            else graph.cnIndex.Add ("callNum", [newNode])
+            let cn = res.["callNum"]
+            if graph.cnIndex.ContainsKey cn then
+                graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
+            else graph.cnIndex.Add (cn, [newNode])
         // Lastly, return the new node, in case it needs to be examined.
         Some newNode
 
@@ -275,6 +253,24 @@ let rec addSubject graph (label: string) (callLetters : string option) =
         (* Maybe complex subjects only get added to the hash table, 
             because they're book-identifying? *)
     
+/// Add a book's subjects to a graph (and add the book too?)
+let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
+    // for each subject, add it, get node back 
+    let nodes = List.map (fun subj -> addSubject graph subj book.LCLetters) book.Subjects
+                |> List.choose id
+    // If we're storing books too, add it and update the counts
+    if addBook then
+        let rec updateCounts node = 
+            node.booksUnder <- node.booksUnder + 1
+            List.iter updateCounts node.broader
+        List.iter (
+            fun node -> node.books.Add(book)
+                        updateCounts node
+            ) nodes
+    if nodes.IsEmpty then
+        Logger.Alert (sprintf "No subject found for \"%s\"; book not added" book.Title)
+        false
+    else true
 
 /// Loop to browse a graph.
 /// Currently only does a tree walk (no sideways links)
@@ -337,25 +333,6 @@ let browseGraph (graph : SubjectGraph) =
         (* active pattern to match and interpret? *)
     loop graph.topLevel
         
-/// Add a book's subjects to a graph (and add the book too?)
-let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
-    // for each subject, add it, get node back 
-    let nodes = List.map (fun subj -> addSubject graph subj book.LCLetters) book.Subjects
-                |> List.choose id
-    // If we're storing books too, add it and update the counts
-    if addBook then
-        let rec updateCounts node = 
-            node.booksUnder <- node.booksUnder + 1
-            List.iter updateCounts node.broader
-        List.iter (
-            fun node -> node.books.Add(book)
-                        updateCounts node
-            ) nodes
-    if nodes.IsEmpty then
-        Logger.Alert (sprintf "No subject found for \"%s\"; book not added" book.Title)
-        false
-    else true
-
 // Maybe I won't need to use the RDF library at all. 
 (*
 let loadSchema filename = 

@@ -24,10 +24,9 @@ let isCNLetters s =
     String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
 
 let topCallLetters = Map.ofList [
-    ("A", "General Works");
-    ("B", "Philosophy. Psychology. Religion");
-    ("C", "Auxiliary Sciences of History");    
-]
+                        ("A", "General Works");
+                        ("B", "Philosophy. Psychology. Religion");
+                        ("C", "Auxiliary Sciences of History"); ]
 
 let applyOption x someFn noThing = 
     match x with
