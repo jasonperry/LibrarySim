@@ -36,7 +36,7 @@ for row in index.Rows do
         callNumRange = if row.``Call Num`` = "" then None
                        else Some row.``Call Num``
         // should throw if parents don't exist (haven't been added)
-        broader = List.map (fun u -> theGraph.subjectUriIndex.[Uri u]) parents
+        broader = List.map (fun u -> theGraph.uriIndex.[Uri u]) parents
         narrower = new List<SubjectNode>()
         books = new List<BookRecord>()
         booksUnder = 0
@@ -44,7 +44,7 @@ for row in index.Rows do
     nodeCount <- nodeCount + 1
     printf "%d.." nodeCount
     // should really only have one for the top-level index. Test this.
-    theGraph.subjectUriIndex.Add(node.uri, node)
+    theGraph.uriIndex.Add(node.uri, node)
     for label in node.name :: altnames do
         if theGraph.subjectNameIndex.ContainsKey(label) then
             printfn "Warning: subject name '%s' already exists" label

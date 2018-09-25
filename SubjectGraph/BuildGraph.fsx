@@ -11,12 +11,22 @@ open System.Collections.Generic (* Always need this for lists. *)
 open System.Runtime.Serialization.Formatters.Binary
 open BookRecord
 
+let ADD_BOOKS = true
+let bookRecordsFileName = "records.brb"
 let graphFileName = "graph.sgb"
-let theGraph = emptyGraph()
+let topLevelGraph = "TopLevelIndex.sgb"
+
+// Load the top-level graph
+let theGraph = 
+    if topLevelGraph = "" then
+        SubjectGraph.emptyGraph()
+    else 
+        SubjectGraph.loadGraph topLevelGraph
+        
 
 let booklist = 
     let booksFormatter = BinaryFormatter()
-    let stream = new FileStream("records.brb", FileMode.Open)
+    let stream = new FileStream(bookRecordsFileName, FileMode.Open)
     let bl = booksFormatter.Deserialize(stream) // has type 'obj'
     stream.Close()
     bl :?> List<BookRecord> 
@@ -25,11 +35,11 @@ let booklist =
 //  (so we won't have to start all over.)
 let success = Seq.mapi (fun i book -> // try 
                             printfn "Adding subjects for book number %d " i
-                            addBookSubjects theGraph true book) 
+                            addBookSubjects theGraph ADD_BOOKS book) 
                         booklist
 
 printfn "Processed %d books, generating %d subject headings" 
-        booklist.Count theGraph.subjectUriIndex.Count
+        booklist.Count theGraph.uriIndex.Count
 printfn "%d books not added (no subject found)" 
         <| Seq.length (Seq.filter (not) success)
 

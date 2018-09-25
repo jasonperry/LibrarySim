@@ -1,3 +1,5 @@
+/// Browse a serialized SubjectGraph using a textual interface. 
+
 // All code libraries have to be loaded, but only things you use need to be opened.
 #r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
 #r "System.Xml.Linq.dll"

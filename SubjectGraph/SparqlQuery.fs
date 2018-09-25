@@ -5,7 +5,7 @@ open System.IO      (* StreamReader *)
 open System.Net     (* for HTTP requests *)
 open System.Xml.Linq
 
-(* TODO: read this from an .ini file THAT ISN'T SOURCE CONTROLLED! *)
+// TODO: read this from an .ini file THAT ISN'T SOURCE CONTROLLED! 
 let endpoint = "http://35.202.98.137:3030/locsh"
 
 // Used by all the functions that construct queries.
@@ -43,7 +43,8 @@ type SparqlResult = {
                                resultlist 
         }
 
-/// The boilerplate for sending a query.
+/// The boilerplate for sending a query. TODO: handle connection errors
+/// System.Net.WebException
 let sparqlQuery (queryString : string) = 
     let url = endpoint + "?query=" + HttpUtility.UrlEncode(queryString)
     let req = HttpWebRequest.Create(url) :?> HttpWebRequest

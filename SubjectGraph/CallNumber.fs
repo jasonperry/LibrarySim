@@ -33,6 +33,8 @@ let applyOption x someFn noThing =
         | Some v -> someFn v
         | None -> noThing
 
+let (|?) = defaultArg
+
 type LCCN = {
     (* Can I use CN's with no number to specify a whole category? 
      * How can I distinguish Z (whole category) from Z (General works)? 
@@ -71,7 +73,8 @@ type LCCN = {
                 misc = if groups.[8] = "" then None
                        else Some (groups.[8].[1..]) 
             }
-        else raise (BadCallNumberException "Could not parse LOC Call Number")
+        else  // TODO: check if all letters.
+            raise (BadCallNumberException "Could not parse LOC Call Number")
     (* TODO: compare if one CN is a more specific version of another? *)
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 

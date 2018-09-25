@@ -64,6 +64,8 @@ let processRecords (data : Marc21Slim.Collection) =
                                     .Replace(" -- ", "--")
                 printfn ": %s" subjTopic
                 subjects.Add(subjTopic)
+            // some books have multiple call letters. This will take the last only.
+            // TODO: make it a mutable list and append.
             elif datafield.Tag = 50 then
                 let cn = (getSubfieldString datafield "a").Value
                 printfn "Call Number: %s" cn
@@ -89,8 +91,8 @@ let processRecords (data : Marc21Slim.Collection) =
                         Title = title.Value + 
                                 if subtitle.IsSome then (" " + subtitle.Value) else "";
                         Authors = if authors.IsSome then authors.Value else "" ;
-                        LCCallNum = None;
-                        LCLetters = None;
+                        LCCallNum = lcCallNum;
+                        LCLetters = lcLetters;
                         Subjects = List.ofSeq(subjects)
             })
             // For now, only books with subjects.
