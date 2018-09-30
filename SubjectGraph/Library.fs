@@ -350,9 +350,10 @@ let browseGraph (graph : SubjectGraph) =
     let rec loop (currentList : List<SubjectNode>) = 
         // When I go up, construct mutable list.. why not make an immutable list?
         List.iteri (fun i node -> 
-                        printf "| %d. %s " i node.name
-                        if node.booksUnder > 0 then
-                            printf "(%d)" node.booksUnder
+                        let entryString = 
+                            (sprintf "| %d. %s (%d) " i node.name node.booksUnder)
+                        printf "%-50s" entryString
+                        if i%2 = 1 || entryString.Length > 50 then printf "\n"
                    ) 
                    (List.ofSeq currentList)
         printf "\n Enter an index, 'u' to go up, 't' to top, or 'q' to quit: "
@@ -370,8 +371,11 @@ let browseGraph (graph : SubjectGraph) =
                     // If the selected node has books, print them. Later, add options to this.
                     if not (Seq.isEmpty (currentList.[i].books)) then
                         printfn "\n**** Books for subject \"%s\" ****" currentList.[i].name
-                        Seq.iter (fun (book: BookRecord) -> printfn "][ %s" book.Title) 
-                                 currentList.[i].books
+                        for book in currentList.[i].books do
+                            printfn "][ %s (%s)" book.Title book.Authors
+                            if Option.isSome book.Link then printfn "   %s" book.Link.Value
+                        (* currentList.[i].books |> 
+                            Seq.iter (fun (book: BookRecord) -> printfn "][ %s" book.Title) *)
                     printfn ""
                     // Print the title before recursing.
                     if not (currentList.[i].narrower.Count = 0) then

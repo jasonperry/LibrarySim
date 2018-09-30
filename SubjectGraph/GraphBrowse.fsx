@@ -13,8 +13,12 @@ open System.Runtime.Serialization.Formatters.Binary
 open System.IO (* for file read and write *)
 open SubjectGraph
 
-let graphFileName = fsi.CommandLineArgs.[1]
-// let graphFileName = "gutengraph.sgb"
+let graphFileName = 
+    if Array.length fsi.CommandLineArgs > 0 then
+        fsi.CommandLineArgs.[1]
+    else "output/graph.sgb"
+
+printfn "Loading subject graph file %s" graphFileName
 
 let graph = 
     let booksFormatter = BinaryFormatter()

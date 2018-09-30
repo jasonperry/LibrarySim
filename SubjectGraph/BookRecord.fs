@@ -8,4 +8,5 @@ type BookRecord = {
     LCCallNum : LCCN option
     LCLetters: string option
     Subjects: string list
+    Link: string option
 }

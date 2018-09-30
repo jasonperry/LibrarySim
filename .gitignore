@@ -216,6 +216,8 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
+
+# Project-specific
 SubjectGraph/graph.sgb
 SubjectGraph/records.brb
 SubjectGraph/topLevelResults.txt

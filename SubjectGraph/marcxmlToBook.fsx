@@ -9,7 +9,7 @@ open System.IO (* for file read and write *)
 open FSharp.Data
 
 let xmlfile = fsi.CommandLineArgs.[1]
-let recordsFileName = "records.brb"
+let recordsFileName = "output\\records.brb"
 
 /// Giving a constant file name initializes the type provider magic.
 type Marc21Slim = XmlProvider<"marcsample.xml"> 
@@ -44,9 +44,10 @@ let processRecords (data : Marc21Slim.Collection) =
         let mutable authors = None (* Optional *)
         let mutable lcCallNum = None
         let mutable lcLetters = None
+        let mutable link = None
         let subjects = new List<string>()
         for datafield in record.Datafields do
-            printfn "Tag %d" datafield.Tag
+            //printfn "Tag %d" datafield.Tag
             if datafield.Tag = 245 then
                 printfn "Title Statement found"
                 title <- getSubfieldString datafield "a"
@@ -83,6 +84,8 @@ let processRecords (data : Marc21Slim.Collection) =
                 let dcn = getSubfieldString datafield "a"
                 printfn "Dewey Call number: %s" dcn.Value
                 withDeweyNum <- withDeweyNum + 1
+            elif datafield.Tag = 856 then
+                link <- getSubfieldString datafield "u"
         // printfn "Subjects: %A" subjects
         totalRecords <- totalRecords + 1
         if subjects.Count > 0 then
@@ -94,6 +97,7 @@ let processRecords (data : Marc21Slim.Collection) =
                         LCCallNum = lcCallNum;
                         LCLetters = lcLetters;
                         Subjects = List.ofSeq(subjects)
+                        Link = link
             })
             // For now, only books with subjects.
     printfn "Processed %d records, %d call numbers, %d subjects," 

@@ -12,9 +12,9 @@ open System.Runtime.Serialization.Formatters.Binary
 open BookRecord
 
 let ADD_BOOKS = true
-let bookRecordsFileName = "records.brb"
-let graphFileName = "graph.sgb"
-let topLevelGraph = "TopLevelIndex.sgb"
+let bookRecordsFileName = "output\\records.brb"
+let graphFileName = "output\\graph.sgb"
+let topLevelGraph = "output\\TopLevelIndex.sgb"
 
 // Load the top-level graph
 let theGraph = 
