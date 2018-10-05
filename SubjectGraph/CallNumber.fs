@@ -3,7 +3,7 @@ module CallNumber
 open System.Text.RegularExpressions
 open System
 
-exception BadCallNumberException of string
+exception CallNumberError of string
 
 (* BEST REGEX EVER *)
 (* ISSUE: Some Gutenberg records have ONLY the letters. Is that a valid CN? *)
@@ -23,11 +23,6 @@ let isCNLetters s =
     let isAlpha c = 'A' <= c && c <= 'z'
     String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
 
-let topCallLetters = Map.ofList [
-                        ("A", "General Works");
-                        ("B", "Philosophy. Psychology. Religion");
-                        ("C", "Auxiliary Sciences of History"); ]
-
 let applyOption x someFn noThing = 
     match x with
         | Some v -> someFn v
@@ -36,16 +31,15 @@ let applyOption x someFn noThing =
 let (|?) = defaultArg
 
 type LCCN = {
-    (* Can I use CN's with no number to specify a whole category? 
-     * How can I distinguish Z (whole category) from Z (General works)? 
-     * Maybe need a separate type for category or range *)
+    // Can I use CN's with no number to specify a whole category? 
+    // How can I distinguish Z (whole category) from Z (General works)? 
     letters : string;
     number : int;
     decimal : Decimal option;
     cutter1 : (char * int) option;
     cutter2 : (char * int) option;
-    date : string option; (* because of "2000b", etc. Lexicographic sorting should work? *)
-    misc : string option; (* "v.1", "c.2", "suppl.", "Pt.1" *)
+    date : string option; // because of "2000b", etc. Lexicographic sorting should work? 
+    misc : string option; // "v.1", "c.2", "suppl.", "Pt.1" 
 } with
     member this.Show () = (* might like to try monadic stuff with this too *)
         this.letters + string this.number
@@ -73,8 +67,9 @@ type LCCN = {
                 misc = if groups.[8] = "" then None
                        else Some (groups.[8].[1..]) 
             }
-        else  // TODO: check if all letters.
-            raise (BadCallNumberException "Could not parse LOC Call Number")
+        else  // TODO: check if all letters. 
+            //      ^-- but it's done by catching in the gutenberg code. Is that good?
+            raise (CallNumberError "Could not parse LOC Call Number")
     (* TODO: compare if one CN is a more specific version of another? *)
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 
@@ -82,7 +77,27 @@ type LCCN = {
         cn1.letters <= cn2.letters 
         || cn1.number <= cn2.number *) 
 
-type LCCNRange = {
-    letters: string
-} (* TODO: constructor from two CN's *)
+module CNRange = 
+
+    type LCCNRange = {  // Should I rename it to T?
+        startCN : LCCN
+        endCN : LCCN
+    } 
+    
+    let create startCN endCN = {startCN = startCN; endCN = endCN}
+    let parse (s : string) = 
+        let cnStrings = s.Split [|'-'|]
+        if Array.length cnStrings = 2 then
+            {startCN = LCCN.Parse cnStrings.[0]; 
+             endCN = LCCN.Parse cnStrings.[1]}
+        elif Array.length cnStrings = 1 then
+            {startCN = LCCN.Parse cnStrings.[0]; 
+             endCN = LCCN.Parse cnStrings.[0]}
+        else 
+            raise  (CallNumberError "Could not parse CN range")
+
+    let contains range cn =       // range.contains cn
+        range.startCN <= cn && cn <= range.endCN
+
+(* TODO: constructor from two CN's *)
   (* TODO: 'Contains' CN method *)
