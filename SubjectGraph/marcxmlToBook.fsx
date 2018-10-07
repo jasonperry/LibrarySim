@@ -1,3 +1,4 @@
+#I __SOURCE_DIRECTORY__
 #r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
 #r "System.Xml.Linq.dll"
 #load "CallNumber.fs"
@@ -9,7 +10,7 @@ open System.IO (* for file read and write *)
 open FSharp.Data
 
 let xmlfile = fsi.CommandLineArgs.[1]
-let recordsFileName = "output\\records.brb"
+let recordsFileName = "output/records.brb"
 
 /// Giving a constant file name initializes the type provider magic.
 type Marc21Slim = XmlProvider<"marcsample.xml"> 

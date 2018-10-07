@@ -1,3 +1,4 @@
+#I __SOURCE_DIRECTORY__
 #r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
 #r "System.Xml.Linq.dll"
 #load "CallNumber.fs"
@@ -12,9 +13,9 @@ open System.Runtime.Serialization.Formatters.Binary
 open BookRecord
 
 let ADD_BOOKS = true
-let bookRecordsFileName = "output\\records.brb"
-let graphFileName = "output\\graph.sgb"
-let topLevelGraph = "output\\TopLevelIndex.sgb"
+let bookRecordsFileName = "output/records.brb"
+let graphFileName = "output/graph.sgb"
+let topLevelGraph = "output/TopLevelIndex.sgb"
 
 // Load the top-level graph
 let theGraph = 

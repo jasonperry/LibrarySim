@@ -1,5 +1,5 @@
 // Read in a completed top-level index .csv file, generate and save a SubjectGraph of it.
-
+#I __SOURCE_DIRECTORY__
 #r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
 #r "System.Xml.Linq.dll"
 #load "CallNumber.fs"  // you have to load all four.
