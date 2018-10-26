@@ -1,0 +1,10 @@
+source https://www.nuget.org/api/v2/
+
+nuget FSharp.Core
+nuget NuGet.CommandLine
+nuget dotNetRDF 1.0.12 prerelease restriction: >= net461
+nuget FSharp.Data 2.4.6 prerelease restriction: >= net452
+nuget HtmlAgilityPack 1.4.9 prerelease restriction: >= net461
+nuget Newtonsoft.Json 8.0.3 prerelease restriction: >= net461
+nuget Suave 2.5.2
+nuget VDS.Common 1.6.4 prerelease restriction: >= net461

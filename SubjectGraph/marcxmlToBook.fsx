@@ -42,7 +42,7 @@ let processRecords (data : Marc21Slim.Collection) =
         printfn "------------"
         let mutable title = None
         let mutable subtitle = None
-        let mutable authors = None (* Optional *)
+        let mutable authors = None 
         let mutable lcCallNum = None
         let mutable lcLetters = None
         let mutable link = None
@@ -55,7 +55,7 @@ let processRecords (data : Marc21Slim.Collection) =
                 subtitle <- getSubfieldString datafield "b"
                 printfn ": %A (%A)" title subtitle
             elif datafield.Tag = 100 then
-                printfn "Primary author found" (* TODO: dig out more authors *)
+                printfn "Primary author found" // TODO: dig out more authors
                 authors <- getSubfieldString datafield "a"
                 printfn ": %A" authors
             (* 150 is the topic heading for Marc21 Full. 
@@ -76,10 +76,10 @@ let processRecords (data : Marc21Slim.Collection) =
                     lcLetters <- Some (lcCallNum.Value.letters)
                 with 
                     // If the call number is letters (gutenberg), detect and store.
-                    | BadCallNumberException es -> 
+                    | CallNumberError errorstr -> 
                         if isCNLetters cn then 
                             lcLetters <- Some cn
-                        else printfn "(!!) %s" es
+                        else printfn "(!!) %s" errorstr
                 withCallNum <- withCallNum + 1
             elif datafield.Tag = 82 then
                 let dcn = getSubfieldString datafield "a"

@@ -7,8 +7,6 @@ open System         (* console *)
 open System.Collections.Generic (* Dictionary, Mutable List *)
 open SparqlQuery
 
-// open RDFSharp.Model
-
 // Beginning of a logging framework. TODO: move to its own module
 // If a module is a singleton, this is good, right?
 module Logger = 
@@ -49,21 +47,6 @@ type SubjectNode = {
     books : List<BookRecord>
     mutable booksUnder : int  // to keep a count
 }
-
-/// Switched to a class, so it's easy to initialize with ().
-(*
-type SubjectGraph() =
-    // Do I still want a single top node?
-    member sg.topLevel : List<SubjectNode> = new List<_>()
-    // May return multiple subjects for a call number.
-    member sg.cnIndex : Dictionary<string, SubjectNode list> = 
-        new Dictionary<_,_> ()
-    member sg.subjectNameIndex : Dictionary<string, SubjectNode list> = 
-        new Dictionary<_,_> ()
-    // Should be unique key....hashset?
-    member sg.subjectUriIndex : Dictionary<BasicUri, SubjectNode> =
-        new Dictionary<_,_> ()
-*)
 
 /// Went back to records because I need to modify the mutable structures.
 type SubjectGraph = {
@@ -108,6 +91,7 @@ let rec isBroaderThan (graph: SubjectGraph) (uri1: BasicUri) (uri2: BasicUri) =
     else 
         List.exists (fun n -> isBroaderThan graph uri1 n.uri) node2.broader
 
+// Not used by addSubjectByCN (but may be added back for more logic)
 let getBroaderTerms (subj : BasicUri) = 
     let queryString = 
         queryPrefix
@@ -182,7 +166,7 @@ let newSubjectUri (graph: SubjectGraph) label callLetters =
     // call num then five digits? count backwards?
     Uri <| "http://knowledgeincoding.net/classif/" + (callLetters |? "XX") + label
 
-// Take a completed subject entry and update other graph structures with its information.
+/// Take a completed subject entry and update other graph structures with its information.
 let updateGraph graph (newNode: SubjectNode) = 
     // 1. Add it as children of all its parents.
     for node in newNode.broader do
@@ -266,48 +250,6 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
         updateGraph graph newNode // fill in narrower and indexes.
         if parents.IsEmpty then None else Some newNode
     
-(* let rec addSubject (graph: SubjectGraph) (label: string) (callLetters : string option) = 
-    // TODO: Sanitize label? Or does Jena already do it? 
-    let label = label.Replace("\"", "\\\"")
-    let qres = pullSubjectData label // Is querying twice going on? 
-    let uri = if qres.results.IsEmpty then 
-        Logger.Warning ("Empty result for label: " + label)
-        // TODO: Add to set of un-found subjects, to examine later.
-        None  
-    // TODO: handle multiple results (multiple subjs with same name...)
-    elif graph.uriIndex.ContainsKey (Uri qres.results.[0].["subj"]) then
-        // TODO: check if the label is already there too, and if not add it
-        Some graph.uriIndex.[Uri qres.results.[0].["subj"]]
-    else
-        // Create new subject node.
-        if qres.results.Length > 1 then
-            Logger.Warning (sprintf "Multiple results for \"%s\", taking only first" label)
-        let res = qres.results.[0]
-        let subj = Uri res.["subj"]
-        // idea: broader immutable, narrower mutable.
-        // NEW: If "have a call number" = getBroaderLOC else ...
-        //   so it will keep going until we have a call number!
-        let broaderSubjects = getBroaderTerms subj
-        // Recursively add the broader subjects. 
-        let broaderNodes = List.map (fun br -> addSubject graph (snd br) callLetters) broaderSubjects 
-                           |> List.choose id  // filters out empties.
-        // LATER: if a "broader" jumps out of the call number range or doesn't have one,
-        //  add the call number topic as a parent (will need to pass call number up.)  
-        let newNode = { 
-            uri = subj;
-            name = label; // keep variant names in hash table 
-            callNumRange = if res.ContainsKey "callNum" then // is there a "dictopt"?
-                                Some (res.["callNum"])
-                           else None;
-            broader = broaderNodes;
-            narrower = new List<SubjectNode>(); 
-            books = new List<BookRecord>();
-            booksUnder = 0
-        }
-        updateGraph graph newNode
-        // Lastly, return the new node, in case it needs to be examined.
-        Some newNode *)
-
         // Then add this to the broader's narrower list. 
         (* Also a query to get variant names; add them to the hash table *)
         (* Maybe complex subjects only get added to the hash table, 
@@ -405,6 +347,8 @@ let browseGraph (graph : SubjectGraph) =
         
 // Maybe I won't need to use the RDF library at all. 
 (*
+open RDFSharp.Model
+
 let loadSchema filename = 
     // let g = RDFGraph.FromFile (RDFModelEnums.RDFFormats.RdfXml, filename)
     printf "did something."

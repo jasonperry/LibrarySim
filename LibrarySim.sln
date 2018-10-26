@@ -3,6 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2036
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{615BE5FB-B630-428E-B7EA-2A3AD7423B1E}"
+	ProjectSection(SolutionItems) = preProject
+		paket.dependencies = paket.dependencies
+	EndProjectSection
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibraryCmd", "LibraryCmd\LibraryCmd.csproj", "{6969C8CC-918A-4FA4-8DFA-46C871C19E25}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibraryCode", "LibraryCode\LibraryCode.csproj", "{D1E06BB7-B260-42F5-B1FA-D830B6548E6C}"

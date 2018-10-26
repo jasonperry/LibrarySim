@@ -5,11 +5,11 @@ open System
 
 exception CallNumberError of string
 
-(* BEST REGEX EVER *)
-(* ISSUE: Some Gutenberg records have ONLY the letters. Is that a valid CN? *)
-(* Still to check: how many digits can cutter numbers and decimals have? *)
-(* To fix: 1st cutter can be something besides letter + digits *)
-(* groups: 1: letters, 2: number, 3: decimal 4: rest1, 5: cutter1, 6: cutter2, 7: space+year *)
+// BEST REGEX EVER 
+// ISSUE: Some Gutenberg records have ONLY the letters. Is that a valid CN? 
+// Still to check: how many digits can cutter numbers and decimals have? 
+// To fix: 1st cutter can be something besides letter + digits 
+// groups: 1: letters, 2: number, 3: decimal 4: rest1, 5: cutter1, 6: cutter2, 7: space+year 
 let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                  + " ?([0-9]{1,5})"         // g2: number
                  + "(\.[0-9]{1,4})? ?"      // g3: decimal
@@ -47,8 +47,8 @@ type LCCN = {
         + applyOption this.cutter1 (fun x -> "." + string (fst x) + string (snd x)) ""
         + applyOption this.cutter2 (fun x -> " " + string (fst x) + string (snd x)) ""
         + applyOption this.date string ""
-    static member Parse cnstr = 
-        let m = Regex.Match(cnstr, LCCN_REGEX)
+    static member Parse cnString = 
+        let m = Regex.Match(cnString, LCCN_REGEX)
         if m.Success then 
             let groups = [ for g in m.Groups -> g.Value ]
             printfn "%s" (groups.ToString ()) (* DEBUG *)
