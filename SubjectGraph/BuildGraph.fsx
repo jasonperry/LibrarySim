@@ -1,14 +1,11 @@
-#I __SOURCE_DIRECTORY__
-#r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
+#I __SOURCE_DIRECTORY__  // though it doesn't need any packages
 #r "System.Xml.Linq.dll"
-#load "CallNumber.fs"
-#load "BookRecord.fs"
-#load "SparqlQuery.fs"
-#load "Library.fs"
+// Serializing from the object code solves the assembly problems! Woohoo!
+#r "obj/Debug/net461/SubjectGraph.exe"
 
 open System.IO // for file read and write 
 open SubjectGraph
-open System.Collections.Generic (* Always need this for lists. *)
+open System.Collections.Generic // Always need this for lists.
 open System.Runtime.Serialization.Formatters.Binary
 open BookRecord
 
@@ -23,7 +20,6 @@ let theGraph =
         SubjectGraph.emptyGraph()
     else 
         SubjectGraph.loadGraph topLevelGraph
-        
 
 let booklist = 
     let booksFormatter = BinaryFormatter()
@@ -45,10 +41,7 @@ printfn "%d books not added (no subject found)"
         <| Seq.length (Seq.filter (not) success)
 
 // write to disk.
-let graphFormatter = BinaryFormatter()
-let stream = new FileStream(graphFileName, FileMode.Create)
-graphFormatter.Serialize(stream, theGraph)
-stream.Close()
+saveGraph theGraph graphFileName
 
 printfn "Wrote subject graph file to %s" graphFileName
 

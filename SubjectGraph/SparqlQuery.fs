@@ -1,8 +1,7 @@
 module SparqlQuery
 
-open System.Web
-open System.IO      (* StreamReader *)
-open System.Net     (* for HTTP requests *)
+open System.IO      // StreamReader 
+open System.Net     // for HTTP requests
 open System.Xml.Linq
 
 // TODO: read this from an .ini file THAT ISN'T SOURCE CONTROLLED! 
@@ -46,7 +45,8 @@ type SparqlResult = {
 /// The boilerplate for sending a query. TODO: handle connection errors
 /// System.Net.WebException
 let sparqlQuery (queryString : string) = 
-    let url = endpoint + "?query=" + HttpUtility.UrlEncode(queryString)
+    // System.Web.HttpUtility worked before. Ah well.
+    let url = endpoint + "?query=" + System.Net.WebUtility.UrlEncode(queryString)
     let req = HttpWebRequest.Create(url) :?> HttpWebRequest
     req.Method <- "GET" (* Probably the default. *)
     req.ContentType <- "application/x-www-form-urlencoded"

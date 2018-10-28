@@ -1,20 +1,27 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- If we omit this, it's a dll and has no EntryPoint. -->
+    <OutputType>Exe</OutputType> 
     <!-- This determines which versions of the packages it will pull. -->
-    <!-- <TargetFramework>net461</TargetFramework> -->
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
+    <!-- <TargetFramework>netstandard2.0</TargetFramework> Not a runnable framework! -->
+    <!-- <TargetFramework>netcoreapp2.1</TargetFramework> -->
   </PropertyGroup>
+  <!-- <ItemGroup>
+    <PackageReference Include="RDFSharp" Version="1.0.1" /> 
+  </ItemGroup>
+  <Import Project="..\.paket\Paket.Restore.targets" />  -->
   <ItemGroup>
     <Compile Include="CallNumber.fs" />
     <Compile Include="BookRecord.fs" />
     <Compile Include="SparqlQuery.fs" />
-    <Compile Include="Library.fs" />
-    <!-- have to be in order? -->
+    <Compile Include="Library.fs" /> 
     <Compile Include="SubjectGraphAPI.fs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- <PackageReference Include="RDFSharp" Version="1.0.1" /> -->
+    <PackageReference Include="FSharp.Data" Version="3.0.0" />
+    <PackageReference Include="Newtonsoft.JSON" Version="11.0.2" />
+    <PackageReference Include="Suave" Version="2.5.2" />
   </ItemGroup>
-  <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>

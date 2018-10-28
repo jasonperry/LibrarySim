@@ -1,21 +1,16 @@
+open System.Runtime.Serialization.Formatters.Binary
 // Read in a completed top-level index .csv file, generate and save a SubjectGraph of it.
-#I __SOURCE_DIRECTORY__
-#r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
-#r "System.Xml.Linq.dll"
-#load "CallNumber.fs"  // you have to load all four.
-#load "BookRecord.fs"
-#load "SparqlQuery.fs"
-#load "Library.fs"
+#I "C:\\Users\\Jason\\"
+#r ".nuget/packages/FSharp.Data/3.0.0/lib/net45/FSharp.Data.dll"
+#r "System.Xml.Linq.dll" 
+// Serializing from the object code solves the assembly problems! Woohoo!
+#r "obj/Debug/net461/SubjectGraph.exe"
 
 // Rearranging the order like this fixed broken serialization
-open System.IO // for file read and write
 open SubjectGraph
 open System.Collections.Generic
-open System.Runtime.Serialization.Formatters.Binary
-//open FSharp.Data
 open BookRecord
-
-let graphFileName = "TopLevelIndex.sgb"
+let graphFileName = "output/TopLevelIndex.sgb"
 [<Literal>] 
 let CSVFILE = "../bookdata/TopLevelIndex.csv"
 
@@ -73,9 +68,6 @@ printfn "Added %d call letters/ranges" theGraph.cnIndex.Count
 // testing
 //browseGraph theGraph
 
-let graphFormatter = BinaryFormatter()
-let stream = new FileStream(graphFileName, FileMode.Create)
-graphFormatter.Serialize(stream, theGraph)
-stream.Close()
+saveGraph theGraph graphFileName
 
 printfn "Graph saved to %s" graphFileName

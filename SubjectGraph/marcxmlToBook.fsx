@@ -1,8 +1,11 @@
-#I __SOURCE_DIRECTORY__
-#r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
-#r "System.Xml.Linq.dll"
-#load "CallNumber.fs"
-#load "BookRecord.fs"
+//#I __SOURCE_DIRECTORY__
+//#r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
+#I "C:\\Users\\Jason\\"
+#r ".nuget/packages/FSharp.Data/3.0.0/lib/net45/FSharp.Data.dll"
+#r "System.Xml.Linq.dll" // guess it's the net45 version.
+#r "obj/Debug/net461/SubjectGraph.exe"
+// #load "CallNumber.fs"
+// #load "BookRecord.fs"
 open BookRecord
 open CallNumber
 open System.Collections.Generic (* Always need this for lists. *)
@@ -108,6 +111,7 @@ let processRecords (data : Marc21Slim.Collection) =
     books
 
 let allbooks = processRecords (Marc21Slim.Parse (File.ReadAllText xmlfile))
+//let allbooks = processRecords (Marc21Slim.Load(xmlfile))
 
 /// save list of book records to disk
 open System.Runtime.Serialization.Formatters.Binary

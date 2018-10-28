@@ -371,3 +371,9 @@ let loadGraph graphFileName =
     let bl = booksFormatter.Deserialize(stream)
     stream.Close()
     bl :?> SubjectGraph
+
+let saveGraph (graph: SubjectGraph) graphFileName = 
+    let graphFormatter = BinaryFormatter()
+    let stream = new FileStream(graphFileName, FileMode.Create)
+    graphFormatter.Serialize(stream, graph)
+    stream.Close()
