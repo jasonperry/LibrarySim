@@ -13,10 +13,11 @@
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />  -->
   <ItemGroup>
+    <Compile Include="Logger.fs" />
     <Compile Include="CallNumber.fs" />
     <Compile Include="BookRecord.fs" />
     <Compile Include="SparqlQuery.fs" />
-    <Compile Include="Library.fs" /> 
+    <Compile Include="SubjectGraph.fs" /> 
     <Compile Include="SubjectGraphAPI.fs" />
   </ItemGroup>
   <ItemGroup>

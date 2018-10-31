@@ -4,7 +4,7 @@ open Suave.Filters
 open Suave.Operators
 open Suave.Utils.Collections
 //open Suave.Sockets
-//open Newtonsoft.Json
+open Newtonsoft.Json
 
 type SubjectsResult = {
   thisSubjectUri : string;
@@ -28,32 +28,24 @@ type BooksResult = {
   books : BookRecord.BookRecord list
 }
 
+// TODO: monadize the error handling.  -> WebResult string
+let getSubjectResult g q = 
+  defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
+  |> fun uri -> SubjectsResult.ofNode g.uriIndex.[Uri uri]
+  |> JsonConvert.SerializeObject
 
-// Should understand how the runtime loading will work.
-let theGraph = loadGraph "output/graph.sgb"
-printfn "Loaded subject graph"
-
-let nodeToJSON node = 
-    "{" + "}"
-(* let browseAtSubject uri =
-    // pull out URIs of broader and narrower (plus books).
-    let node = theGraph.uriIndex.[uri]
-    nodeToJSON node *)
-
-let sendSubject q = 
-  defaultArg (Option.ofChoice (q ^^ "uri")) "World" |> sprintf "Chose subject uri %s"
-
-let dispatch =
+let dispatch g =
   choose 
     [ GET >=> choose
         [ path "/hello" >=> Successful.OK "Hello GET"
-          path "/goodbye" >=> Successful.OK "Good bye GET" 
-          path "/subject" >=> request (fun r -> Successful.OK (sendSubject r.query))]
+          path "/subject" >=> request (fun r -> Successful.OK (getSubjectResult g r.query))]
       POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
           path "/goodbye" >=> Successful.OK "Good bye POST" ] ]
 
 [<EntryPoint>]
 let main _ =
-  startWebServer defaultConfig dispatch //(Successful.OK "Hello, Suave!")
+  let theGraph = loadGraph "output/graph.sgb"
+  printfn "Loaded subject graph"
+  startWebServer defaultConfig (dispatch theGraph) //(Successful.OK "Hello, Suave!")
   0

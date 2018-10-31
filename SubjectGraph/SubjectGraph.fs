@@ -2,33 +2,9 @@
 module SubjectGraph
 
 open BookRecord
-
 open System         (* console *)
 open System.Collections.Generic (* Dictionary, Mutable List *)
 open SparqlQuery
-
-// Beginning of a logging framework. TODO: move to its own module
-// If a module is a singleton, this is good, right?
-module Logger = 
-    type LogLevel = DEBUG | INFO | WARNING | ALERT | ERROR
-    let mutable private _level = INFO
-    let setLevel level = _level <- level
-    let Debug s = 
-        if _level <= DEBUG then
-            printfn "[DEBUG] %s" s
-    let Info s = 
-        if _level <= INFO then
-            printfn "[INFO] %s" s
-    let Warning s = 
-        if _level <= WARNING then
-            printfn "[WARNING] %s" s
-    let Alert s = 
-        if _level <= ALERT then
-            printfn "[ALERT] %s" s
-    let Error s = 
-        if _level <= ERROR then
-            printfn "[ERROR] %s" s
-
 
 /// A lightweight URI wrapper to differentiate from strings. 
 /// Hope the constructor won't interfere with other library code.
@@ -41,7 +17,7 @@ type SubjectNode = {
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
     callNumRange : string option
     // no explicit refs needed for these, F# uses reference semantics 
-    // It's kind of ingenious that the upwards are immutable and the downwards aren't. 
+    // I thought it was clever that the upwards are immutable and the downwards aren't. 
     broader : SubjectNode list
     narrower : List<SubjectNode> // mutable; new parents not added, but children are
     books : List<BookRecord>
@@ -220,6 +196,8 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
             if callLetters.IsSome && graph.cnIndex.ContainsKey callLetters.Value then
                 // TODO: may want to do "chopping off" to get more depth
                 graph.cnIndex.[callLetters.Value]
+            // Code to use LCSH broader for parents if no call number subject found--
+            //   currently disabled.
             (* elif (not qres.results.IsEmpty) then
                 let broaderSubjects = getBroaderTerms uri
                 // ISSUE: these might be broader than our top-level. 
@@ -258,7 +236,8 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
 /// Add a book's subjects to a graph (and the book too if selected)
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
     // for each subject, add it, get node back 
-    let nodes = List.map (fun subj -> addSubjectByCN graph subj book.LCLetters) book.Subjects
+    let nodes = book.Subjects
+                |> List.map (fun subj -> addSubjectByCN graph subj book.LCLetters) 
                 |> List.choose id
     Logger.Info <| "Finished adding subjects for book \"" + book.Title + "\""
     // If we're storing books too, add it and update the counts
@@ -278,11 +257,10 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
         false
     else true
 
-/// Loop to browse a graph.
-/// Currently only does a tree walk (no sideways links)
-/// Later can parameterize by input/output functions for other interfaces.
+/// Loop to browse a graph. Currently only does a tree walk (no sideways links)
+/// To make generic: pass in a "getCommand", "outputSubjectList" and "outputBookList" funs. 
 let browseGraph (graph : SubjectGraph) = 
-    (* Remember our path back to the root. *)
+    // Remember our path back to the root. 
     let hist = new Stack<List<SubjectNode>> ()
     (* Might like to print out some level info. *)
     (* Should also be getting the book count underneath and skipping if there's just one 
