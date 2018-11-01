@@ -5,13 +5,18 @@
 #r "System.Xml.Linq.dll" // guess it's the net45 version.
 #r "obj/Debug/net461/SubjectGraph.exe"
 // #load "CallNumber.fs"
-// #load "BookRecord.fs"
-open BookRecord
-open CallNumber
+// #load "BookRecord.fs" // These are in the built library now.
+
 open System.Collections.Generic (* Always need this for lists. *)
 open System.IO (* for file read and write *)
 open FSharp.Data
 
+open BookTypes
+open CallNumber
+
+if fsi.CommandLineArgs.Length < 2 then
+    printfn "Need MarcXML file argument"
+    exit(1)
 let xmlfile = fsi.CommandLineArgs.[1]
 let recordsFileName = "output/records.brb"
 
@@ -49,26 +54,26 @@ let processRecords (data : Marc21Slim.Collection) =
         let mutable lcCallNum = None
         let mutable lcLetters = None
         let mutable link = None
-        let subjects = new List<string>()
+        let subjects = new List<SubjectInfo>()
         for datafield in record.Datafields do
             //printfn "Tag %d" datafield.Tag
             if datafield.Tag = 245 then
-                printfn "Title Statement found"
+                printfn "Title Statement found: "
                 title <- getSubfieldString datafield "a"
                 subtitle <- getSubfieldString datafield "b"
                 printfn ": %A (%A)" title subtitle
             elif datafield.Tag = 100 then
-                printfn "Primary author found" // TODO: dig out more authors
+                printf "Primary Author found: " // TODO: dig out more authors
                 authors <- getSubfieldString datafield "a"
                 printfn ": %A" authors
-            (* 150 is the topic heading for Marc21 Full. 
-             * The gutenberg converter uses 653 *)
+            // 150 is the topic heading for Marc21 Full. 
+            // The gutenberg converter uses 653.
             elif datafield.Tag = 650 || datafield.Tag = 653 then // can be multiples of these
-                let subjTopic = (getSubfieldString datafield "a")
+                let subjName = (getSubfieldString datafield "a")
                                     .Value
                                     .Replace(" -- ", "--")
-                printfn ": %s" subjTopic
-                subjects.Add(subjTopic)
+                printfn "Subject (%d): %s" datafield.Tag subjName
+                subjects.Add({ name = subjName; uri = None})
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
             elif datafield.Tag = 50 then

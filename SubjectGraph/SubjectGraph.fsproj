@@ -15,7 +15,7 @@
   <ItemGroup>
     <Compile Include="Logger.fs" />
     <Compile Include="CallNumber.fs" />
-    <Compile Include="BookRecord.fs" />
+    <Compile Include="BookTypes.fs" />
     <Compile Include="SparqlQuery.fs" />
     <Compile Include="SubjectGraph.fs" /> 
     <Compile Include="SubjectGraphAPI.fs" />

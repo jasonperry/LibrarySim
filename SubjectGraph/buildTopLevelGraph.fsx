@@ -9,7 +9,7 @@ open System.Runtime.Serialization.Formatters.Binary
 // Rearranging the order like this fixed broken serialization
 open SubjectGraph
 open System.Collections.Generic
-open BookRecord
+open BookTypes
 let graphFileName = "output/TopLevelIndex.sgb"
 [<Literal>] 
 let CSVFILE = "../bookdata/TopLevelIndex.csv"
@@ -26,12 +26,12 @@ for row in index.Rows do
     let parents = List.filter ((<>) "") [row.Parent1; row.Parent2; row.Parent3]
     let altnames = List.filter ((<>) "") [row.Altlabel1; row.Altlabel2; row.Altlabel3]
     let node = {
-        uri = Uri row.URI
+        uri = System.Uri row.URI
         name = row.``Auth Label``
         callNumRange = if row.``Call Num`` = "" then None
                        else Some row.``Call Num``
         // should throw if parents don't exist (haven't been added)
-        broader = List.map (fun u -> theGraph.uriIndex.[Uri u]) parents
+        broader = List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents
         narrower = new List<SubjectNode>()
         books = new List<BookRecord>()
         booksUnder = 0

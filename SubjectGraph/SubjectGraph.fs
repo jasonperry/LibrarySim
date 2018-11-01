@@ -1,19 +1,14 @@
 /// Constructing and querying a graph of LOC Subject Headings.
 module SubjectGraph
 
-open BookRecord
 open System         (* console *)
 open System.Collections.Generic (* Dictionary, Mutable List *)
+
+open BookTypes
 open SparqlQuery
 
-/// A lightweight URI wrapper to differentiate from strings. 
-/// Hope the constructor won't interfere with other library code.
-type BasicUri = Uri of string
-    with member this.Value = match this with (Uri s) -> s
-         member this.Wrapped = match this with (Uri s) -> "<" + s + ">"
-
 type SubjectNode = {
-    uri : BasicUri;
+    uri : Uri;
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
     callNumRange : string option
     // no explicit refs needed for these, F# uses reference semantics 
@@ -31,7 +26,7 @@ type SubjectGraph = {
     cnIndex : Dictionary<string, SubjectNode list>;  // maybe not unique 
     subjectNameIndex : Dictionary<string, SubjectNode list>;
     // should be unique...hashset? Can we make out of BasicURI...yes.
-    uriIndex : Dictionary<BasicUri, SubjectNode>; 
+    uriIndex : Dictionary<Uri, SubjectNode>; 
 } 
 
 let emptyGraph () =  { 
@@ -56,7 +51,7 @@ let getVariantLabels subj = []
 let getBroaderLCC callNum = []
 
 /// Return true if 1st URI is higher in the graph than the 2nd.
-let rec isBroaderThan (graph: SubjectGraph) (uri1: BasicUri) (uri2: BasicUri) = 
+let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 
     // ? should it accept a node? It should be one-to-one, but...
     let (node1, node2) = graph.uriIndex.[uri1], 
                          graph.uriIndex.[uri2]
@@ -68,11 +63,11 @@ let rec isBroaderThan (graph: SubjectGraph) (uri1: BasicUri) (uri2: BasicUri) =
         List.exists (fun n -> isBroaderThan graph uri1 n.uri) node2.broader
 
 // Not used by addSubjectByCN (but may be added back for more logic)
-let getBroaderTerms (subj : BasicUri) = 
+let getBroaderTerms (subj : Uri) = 
     let queryString = 
         queryPrefix
         + "SELECT ?broader ?label WHERE {\n"
-        +      subj.Wrapped + " madsrdf:hasBroaderAuthority ?broader .\n"
+        +      "<" + subj.ToString() + "> madsrdf:hasBroaderAuthority ?broader .\n"
         + "    ?broader madsrdf:isMemberOfMADSCollection lcsh:collection_LCSH_General .\n"
         + "    ?broader madsrdf:authoritativeLabel ?label .\n"
         + "} LIMIT 10 \n"
@@ -82,11 +77,11 @@ let getBroaderTerms (subj : BasicUri) =
     [ for bindings in res.results -> (bindings.["broader"], bindings.["label"]) ]
     // List.map (fun (k : Map<string,string>) -> "<" + k.["broader"] + ">") res.results
 
-let getNarrowerTerms (subj : BasicUri) = 
+let getNarrowerTerms (subj : Uri) = 
     let queryString = 
         queryPrefix
         + "SELECT ?narrower WHERE {\n"
-        +      subj.Wrapped + " madsrdf:hasNarrowerAuthority ?narrower .\n"
+        +      "<" + subj.ToString() + "> madsrdf:hasNarrowerAuthority ?narrower .\n"
         + "    ?narrower madsrdf:isMemberOfMADSCollection lcsh:collection_LCSH_General \n"
         + "} LIMIT 200 \n"
     Logger.Debug queryString
@@ -235,13 +230,18 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
     
 /// Add a book's subjects to a graph (and the book too if selected)
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
-    // for each subject, add it, get node back 
+    // Try to add a subject for each name, get node back 
     let nodes = book.Subjects
-                |> List.map (fun subj -> addSubjectByCN graph subj book.LCLetters) 
+                |> List.map (fun subj -> addSubjectByCN graph subj.name book.LCLetters) 
                 |> List.choose id
     Logger.Info <| "Finished adding subjects for book \"" + book.Title + "\""
     // If we're storing books too, add it and update the counts
     if addBook then
+        // Add URIs for the found subjects to the book record.
+        let updatedBook = 
+            (List.map (fun (nd: SubjectNode) -> {name = nd.name; uri = Some nd.uri}) nodes)
+            |> List.fold BookRecord.updateSubject book 
+        // update the booksUnder count upward.
         let rec updateCounts node = 
             node.booksUnder <- node.booksUnder + 1
             printf "."
@@ -250,7 +250,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
             // Only add a book under a node if there's no narrower one.
             if not (List.exists (fun n -> isBroaderThan graph node.uri n.uri) nodes) then
                 printfn "Adding book under node %s" node.name
-                node.books.Add(book)
+                node.books.Add(updatedBook)
                 updateCounts node
     if nodes.IsEmpty then
         Logger.Alert (sprintf "No subject found for \"%s\"; book not added" book.Title)

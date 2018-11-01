@@ -7,7 +7,7 @@ open System.IO // for file read and write
 open SubjectGraph
 open System.Collections.Generic // Always need this for lists.
 open System.Runtime.Serialization.Formatters.Binary
-open BookRecord
+open BookTypes
 
 let ADD_BOOKS = true
 let bookRecordsFileName = "output/records.brb"
