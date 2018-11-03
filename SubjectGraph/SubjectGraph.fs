@@ -40,15 +40,12 @@ let emptyGraph () =  {
 
 (* ***************************************************************** *)
 
-// TODO: actually this will just read in a graph file outputted by a script.
+/// Currently done in a script, but may come back here.
 let buildTopLevelLOC = None
     // read in LCC subjects from file (into map?)
     // look it up.
 
 let getVariantLabels subj = []
-
-// Get a broader topic (probably only one) based on LCC.
-let getBroaderLCC callNum = []
 
 /// Return true if 1st URI is higher in the graph than the 2nd.
 let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 
@@ -121,15 +118,10 @@ let querySubjectData (label: string) =
 /// Maybe still a good idea to implement!
 let topicForComplexSubject subjectString = None
 
-// ** Broad directives **     
-(* read catalog entries and create books.
- * pull subject strings out of books and pass to this. *)
+// ** Broad directives ** 
+// Way to construct a call number range when there isn't one: take min and
+// max of narrower ones (assuming the letters match) *)
 
-(* Way to construct a call number range when there isn't one: take min and
- * max of narrower ones (assuming the letters match) *)
-
-/// Add a heading record and all its broader subjects to the graph.
-/// Modifies the graph and returns a node option with the new or found node.
 
 let (|?) = defaultArg
 let newSubjectUri (graph: SubjectGraph) label callLetters = 
@@ -166,6 +158,8 @@ let updateGraph graph (newNode: SubjectNode) =
             graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
         else graph.cnIndex.Add (cn, [newNode]) *)
 
+/// Add a heading record and all its broader subjects to the graph.
+/// Modifies the graph and returns a node option with the new or found node.
 let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : string option) =
     // TODO: get more clear about when/how to clean the label.
     let label = label.Replace("\"", "\\\"")

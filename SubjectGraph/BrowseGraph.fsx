@@ -6,7 +6,6 @@
 #r "obj/Debug/net461/SubjectGraph.exe"
 #r "System.Xml.Linq.dll"
 
-open System.IO (* for file read and write *)
 open SubjectGraph
 
 let graphFileName = 

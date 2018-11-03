@@ -24,6 +24,13 @@ module SubjectsResult =
     narrower = List.ofSeq node.narrower 
       |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
   }
+  /// Construct a result object corresponding to the top level.
+  let topLevel (g : SubjectGraph) = {
+    thisSubject = {uri = None; name = "Top Level"};
+    broader = [];
+    narrower = List.ofSeq (g.topLevel)
+      |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
+  }
 
 type BooksResult = {
   thisSubject : SubjectInfo; // list? Yes!
@@ -38,9 +45,14 @@ module BooksResult =
   }
 
 // TODO: monadize the error handling.  -> WebResult string
+// The ^^ is the "request combinator"
 let getSubjectResult g q = 
   defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
-  |> fun uriStr -> SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
+  |> fun uriStr -> 
+    if uriStr = "top" then 
+      SubjectsResult.topLevel g
+    else 
+      SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
   |> JsonConvert.SerializeObject
 
 let getBookResult g q = 
@@ -51,7 +63,7 @@ let getBookResult g q =
 let dispatch g =
   choose 
     [ GET >=> choose
-        [ path "/hello" >=> Successful.OK "Hello GET"
+        [ 
           path "/subject" >=> request (fun r -> Successful.OK (getSubjectResult g r.query))
           path "/books" >=> request (fun r -> Successful.OK (getBookResult g r.query)) ]
       POST >=> choose
