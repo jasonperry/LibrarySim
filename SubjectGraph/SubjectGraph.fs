@@ -1,8 +1,8 @@
 /// Constructing and querying a graph of LOC Subject Headings.
 module SubjectGraph
 
-open System         (* console *)
-open System.Collections.Generic (* Dictionary, Mutable List *)
+open System
+open System.Collections.Generic
 
 open BookTypes
 open SparqlQuery
@@ -10,38 +10,51 @@ open SparqlQuery
 type SubjectNode = {
     uri : Uri;
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
-    callNumRange : string option
+    subdividedName : string list;
+    callNumRange : string option;
     // no explicit refs needed for these, F# uses reference semantics 
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
-    broader : SubjectNode list
-    narrower : List<SubjectNode> // mutable; new parents not added, but children are
-    books : List<BookRecord>
+    broader : SubjectNode list;
+    narrower : List<SubjectNode>; // mutable; new parents not added, but children are
+    books : List<BookRecord>;
     mutable booksUnder : int  // to keep a count
 }
 
-/// Went back to records because I need to modify the mutable structures.
+module SubjectNode =
+    let isNarrower node1 node2 = 
+        let rec isPrefix l1 l2 = 
+            match (l1, l2) with 
+                | ([], _) -> true
+                | (x::xs, y::ys) -> x = y && isPrefix xs ys
+                | _ -> false
+        isPrefix node1.subdividedName node2.subdividedName
+    let isBroader n1 n2 = not (isNarrower n1 n2)
+
+/// SubjectGraph record type.
 type SubjectGraph = {
-    topLevel : List<SubjectNode>; 
-    // went back to immutable lists. Even broaders won't actually be added twice.
-    cnIndex : Dictionary<string, SubjectNode list>;  // maybe not unique 
-    subjectNameIndex : Dictionary<string, SubjectNode list>;
-    // should be unique...hashset? Can we make out of BasicURI...yes.
-    uriIndex : Dictionary<Uri, SubjectNode>; 
-} 
+        // I tried making it a class but then couldn't modify the mutable fields.
+        topLevel : List<SubjectNode>; 
+        // went back to immutable lists. Even broaders won't actually be added twice.
+        cnIndex : Dictionary<string, SubjectNode list>;  // maybe not unique 
+        subjectNameIndex : Dictionary<string, SubjectNode list>;
+        // should be unique...hashset? Can we make out of BasicURI...yes.
+        uriIndex : Dictionary<Uri, SubjectNode>; 
+    } 
 
-let emptyGraph () =  { 
-    // TODO: change to have a top node instead of a top level.
-    topLevel = new List<_> (); // Later: read from pre-generated list.
-    cnIndex = new Dictionary<_,_> ();
-    subjectNameIndex = new Dictionary<_,_> ();
-    uriIndex = new Dictionary<_,_> ()
-}
-
+/// Module to allow a private constructor, but doesn't have a working one yet.
+module SubjectGraph = 
+    let emptyGraph () =  { 
+        // TODO: change to have a top node instead of a top level.
+        topLevel = new List<_> (); // Later: read from pre-generated list.
+        cnIndex = new Dictionary<_,_> ();
+        subjectNameIndex = new Dictionary<_,_> ();
+        uriIndex = new Dictionary<_,_> ()
+    }
 
 (* ***************************************************************** *)
 
 /// Currently done in a script, but may come back here.
-let buildTopLevelLOC = None
+//let buildTopLevelLOC = 
     // read in LCC subjects from file (into map?)
     // look it up.
 

@@ -31,8 +31,6 @@ let applyOption x someFn noThing =
 let (|?) = defaultArg
 
 type LCCN = {
-    // Can I use CN's with no number to specify a whole category? 
-    // How can I distinguish Z (whole category) from Z (General works)? 
     letters : string;
     number : int;
     decimal : Decimal option;
@@ -40,18 +38,19 @@ type LCCN = {
     cutter2 : (char * int) option;
     date : string option; // because of "2000b", etc. Lexicographic sorting should work? 
     misc : string option; // "v.1", "c.2", "suppl.", "Pt.1" 
-} with
-    member this.Show () = (* might like to try monadic stuff with this too *)
-        this.letters + string this.number
-        + applyOption this.decimal string ""
-        + applyOption this.cutter1 (fun x -> "." + string (fst x) + string (snd x)) ""
-        + applyOption this.cutter2 (fun x -> " " + string (fst x) + string (snd x)) ""
-        + applyOption this.date string ""
-    static member Parse cnString = 
-        let m = Regex.Match(cnString, LCCN_REGEX)
+} 
+module LCCN = 
+    let show (cn : LCCN) = (* might like to try monadic stuff with this too *)
+        cn.letters + string cn.number
+        + applyOption cn.decimal string ""
+        + applyOption cn.cutter1 (fun x -> "." + string (fst x) + string (snd x)) ""
+        + applyOption cn.cutter2 (fun x -> " " + string (fst x) + string (snd x)) ""
+        + applyOption cn.date string ""
+    let parse (cnString : string) = 
+        let m = Regex.Match(cnString.ToUpper(), LCCN_REGEX)
         if m.Success then 
             let groups = [ for g in m.Groups -> g.Value ]
-            printfn "%s" (groups.ToString ()) (* DEBUG *)
+            // printfn "%s" (groups.ToString ()) (* DEBUG *)
             { 
                 letters = groups.[1];
                 number = int (groups.[2]);
@@ -67,37 +66,49 @@ type LCCN = {
                 misc = if groups.[8] = "" then None
                        else Some (groups.[8].[1..]) 
             }
-        else  // TODO: check if all letters. 
-            //      ^-- but it's done by catching in the gutenberg code. Is that good?
+        else
             raise (CallNumberError "Could not parse LOC Call Number")
-    (* TODO: compare if one CN is a more specific version of another? *)
+    /// True if two call numbers are the same except for year and misc.
+    let sameTitle cn1 cn2 = 
+        cn1.letters = cn2.letters && cn1.number = cn2.number
+        && cn1.decimal = cn2.decimal && cn1.cutter1 = cn2.cutter1
+        && cn1.cutter2 = cn2.cutter2
+    /// True if first call number is more specific but otherwise equal. Equal is false.
+    let moreSpecific cn1 cn2 = 
+        cn1.letters = cn2.letters && cn1.number = cn2.number 
+        && (cn1.decimal.IsSome && cn2.decimal.IsNone    // can short-circuit here
+            || (cn1.decimal = cn2.decimal &&            // Okay if they're None?
+                (cn1.cutter1.IsSome && cn2.cutter1.IsNone
+                 || (cn1.cutter1 = cn1.cutter1 && 
+                     (cn1.cutter2.IsSome && cn1.cutter2.IsNone)))))
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 
-        printf "hi"
         cn1.letters <= cn2.letters 
         || cn1.number <= cn2.number *) 
 
-module CNRange = 
-
-    type LCCNRange = {  // Should I rename it to T?
-        startCN : LCCN
-        endCN : LCCN
-    } 
-    
-    let create startCN endCN = {startCN = startCN; endCN = endCN}
+// TODO: Range *should* allow a 'letters-only' CN. Then how to compare? Make a "magic" numbers value?
+type LCCNRange = { 
+    startCN : LCCN
+    endCN : LCCN
+} 
+module CNRange = // nice if it could be a functor over types of CNs...
+    let create startCN endCN = 
+        if startCN > endCN then
+            raise (CallNumberError "Illegal CN Range: Start Call Number is higher")
+        else 
+            {startCN = startCN; endCN = endCN}
     let parse (s : string) = 
         let cnStrings = s.Split [|'-'|]
         if Array.length cnStrings = 2 then
-            {startCN = LCCN.Parse cnStrings.[0]; 
-             endCN = LCCN.Parse cnStrings.[1]}
+            {startCN = LCCN.parse cnStrings.[0]; 
+             endCN = LCCN.parse cnStrings.[1]}
         elif Array.length cnStrings = 1 then
-            {startCN = LCCN.Parse cnStrings.[0]; 
-             endCN = LCCN.Parse cnStrings.[0]}
+            {startCN = LCCN.parse cnStrings.[0]; 
+             endCN = LCCN.parse cnStrings.[0]}
         else 
             raise  (CallNumberError "Could not parse CN range")
-
     let contains range cn =       // range.contains cn
         range.startCN <= cn && cn <= range.endCN
+    let isSubRange range1 range2 = 
+        contains range2 range1.startCN && contains range2 range1.endCN
 
-(* TODO: constructor from two CN's *)
-  (* TODO: 'Contains' CN method *)

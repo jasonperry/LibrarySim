@@ -55,7 +55,7 @@ let getSubjectResult g q =
       SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
   |> JsonConvert.SerializeObject
 
-let getBookResult g q = 
+let getBookResult (g: SubjectGraph) q = 
   defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
   |> fun uriStr -> BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
   |> JsonConvert.SerializeObject
