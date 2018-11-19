@@ -24,5 +24,8 @@
     <PackageReference Include="FSharp.Data" Version="3.0.0" />
     <PackageReference Include="Newtonsoft.JSON" Version="11.0.2" />
     <PackageReference Include="Suave" Version="2.5.2" />
+    <!-- <PackageReference Include="System.Runtime.Serialization.Formatters" Version="4.3.0" />
+    <PackageReference Include="BinaryFormatter" Version="2.1.4" />
+    <PackageReference Include="System.Xml.XDocument" Version="4.3.0" />  -->
   </ItemGroup>
 </Project>

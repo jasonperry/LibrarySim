@@ -10,6 +10,7 @@ open Newtonsoft.Json
 open BookTypes
 open SubjectGraph
 
+/// Immutable SubjectNode info returned by the API.
 type SubjectsResult = {
   thisSubject : SubjectInfo;
   broader : SubjectInfo list;
@@ -19,10 +20,12 @@ module SubjectsResult =
   let ofNode (node : SubjectNode) = {
     thisSubject = {uri = Some node.uri; name = node.name};
     broader = node.broader 
-      |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
+      |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
+      |> List.ofSeq;
       // Q: Is there a way to cast this to not convert the whole list? I've tried...
-    narrower = List.ofSeq node.narrower 
-      |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
+    narrower = node.narrower 
+      |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
+      |> List.ofSeq;
   }
   /// Construct a result object corresponding to the top level.
   let topLevel (g : SubjectGraph) = {

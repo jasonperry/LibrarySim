@@ -14,7 +14,7 @@ type SubjectNode = {
     callNumRange : string option;
     // no explicit refs needed for these, F# uses reference semantics 
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
-    broader : SubjectNode list;
+    broader : List<SubjectNode>; // SubjectNode list;  So sad, had to make it mutable...
     narrower : List<SubjectNode>; // mutable; new parents not added, but children are
     books : List<BookRecord>;
     mutable booksUnder : int  // to keep a count
@@ -50,13 +50,51 @@ module SubjectGraph =
         subjectNameIndex = new Dictionary<_,_> ();
         uriIndex = new Dictionary<_,_> ()
     }
-
+    /// Take a completed subject entry and update other graph structures with its information.
+    let addNode graph (newNode: SubjectNode) = 
+        // 1. Add it as children of all its parents.
+        for node in newNode.broader do
+            node.narrower.Add newNode
+        (* if newNode.broader.IsEmpty then
+            // check if it was already added 
+            if not (graph.uriIndex.ContainsKey newNode.uri) then
+                // Temp: don't add complex nodes with no broader
+                if res.["complex"] = "false" then 
+                    graph.topLevel.Add newNode
+                else 
+                    Logger.Warning (sprintf "Complex subject %s not added" newNode.name) *)
+        // 2. Add key and value to subject name index. TODO: add variants.
+        if not (graph.subjectNameIndex.ContainsKey newNode.name) then
+            graph.subjectNameIndex.Add (newNode.name, [newNode])
+        else
+            // It's OK just to append because we know it's a new node.
+            graph.subjectNameIndex.[newNode.name] <- (newNode :: graph.subjectNameIndex.[newNode.name])
+        // 3. Add the new subject URI to that index.
+        graph.uriIndex.Add(newNode.uri, newNode)
+        // 4. If subject has a call number, add that to the index.
+        // NOT APPROPRIATE if it's just letters. TODO: add test.
+        (*if newNode.callNumRange.IsSome then // res.ContainsKey "callNum" then
+            let cn = newNode.callNumRange.Value
+            if graph.cnIndex.ContainsKey cn then
+                graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
+            else graph.cnIndex.Add (cn, [newNode]) *)
+    /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
+    /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
+    let makeTopLevel graph = 
+        for node in graph.uriIndex.Values do
+            if node.broader.Count = 0 then
+                graph.topLevel.Add(node)
 (* ***************************************************************** *)
 
 /// Currently done in a script, but may come back here.
 //let buildTopLevelLOC = 
     // read in LCC subjects from file (into map?)
     // look it up.
+
+let splitSubjectName (name : string) = 
+    name.Replace(" -- ", "--").Replace("--","-").Split(Array.ofList['-'])
+    |> Array.filter (fun s -> s <> "")
+    |> List.ofArray
 
 let getVariantLabels subj = []
 
@@ -65,12 +103,12 @@ let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) =
     // ? should it accept a node? It should be one-to-one, but...
     let (node1, node2) = graph.uriIndex.[uri1], 
                          graph.uriIndex.[uri2]
-    if List.isEmpty (node2.broader) then
+    if node2.broader.Count = 0 then
         false
-    elif List.contains node1 node2.broader then
+    elif node2.broader.Contains(node1)  then
         true
     else 
-        List.exists (fun n -> isBroaderThan graph uri1 n.uri) node2.broader
+        Seq.exists (fun n -> isBroaderThan graph uri1 n.uri) node2.broader
 
 // Not used by addSubjectByCN (but may be added back for more logic)
 let getBroaderTerms (subj : Uri) = 
@@ -142,35 +180,6 @@ let newSubjectUri (graph: SubjectGraph) label callLetters =
     // call num then five digits? count backwards?
     Uri <| "http://knowledgeincoding.net/classif/" + (callLetters |? "XX") + label
 
-/// Take a completed subject entry and update other graph structures with its information.
-let updateGraph graph (newNode: SubjectNode) = 
-    // 1. Add it as children of all its parents.
-    for node in newNode.broader do
-        node.narrower.Add newNode
-    (* if newNode.broader.IsEmpty then
-        // check if it was already added 
-        if not (graph.uriIndex.ContainsKey newNode.uri) then
-            // Temp: don't add complex nodes with no broader
-            if res.["complex"] = "false" then 
-                graph.topLevel.Add newNode
-            else 
-                Logger.Warning (sprintf "Complex subject %s not added" newNode.name) *)
-    // 2. Add key and value to subject name index. TODO: add variants.
-    if not (graph.subjectNameIndex.ContainsKey newNode.name) then
-        graph.subjectNameIndex.Add (newNode.name, [newNode])
-    else
-        // It's OK just to append because we know it's a new node.
-        graph.subjectNameIndex.[newNode.name] <- (newNode :: graph.subjectNameIndex.[newNode.name])
-    // 3. Add the new subject URI to that index.
-    graph.uriIndex.Add(newNode.uri, newNode)
-    // 4. If subject has a call number, add that to the index.
-    // NOT APPROPRIATE if it's just letters. TODO: add test.
-    (*if newNode.callNumRange.IsSome then // res.ContainsKey "callNum" then
-        let cn = newNode.callNumRange.Value
-        if graph.cnIndex.ContainsKey cn then
-            graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
-        else graph.cnIndex.Add (cn, [newNode]) *)
-
 /// Add a heading record and all its broader subjects to the graph.
 /// Modifies the graph and returns a node option with the new or found node.
 let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : string option) =
@@ -198,7 +207,7 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
             if callLetters.IsSome && graph.cnIndex.ContainsKey callLetters.Value then
                 // TODO: may want to do "chopping off" to get more depth
                 graph.cnIndex.[callLetters.Value]
-            // Code to use LCSH broader for parents if no call number subject found--
+            // Code to use LCSH broader for parents if no call number subject found;
             //   currently disabled.
             (* elif (not qres.results.IsEmpty) then
                 let broaderSubjects = getBroaderTerms uri
@@ -219,15 +228,16 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
         let newNode = { 
             uri = uri;
             name = label; (* keep variant names in hash table *)
+            subdividedName = splitSubjectName label
             callNumRange = if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
                                 Some (qres.results.[0].["callNum"])
                            else callLetters;
-            broader = parents;
+            broader = new List<SubjectNode>(parents);
             narrower = new List<SubjectNode>(); 
             books = new List<BookRecord>();
             booksUnder = 0
         }
-        updateGraph graph newNode // fill in narrower and indexes.
+        SubjectGraph.addNode graph newNode // fill in narrower and indexes.
         if parents.IsEmpty then None else Some newNode
     
         // Then add this to the broader's narrower list. 
@@ -252,7 +262,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
         let rec updateCounts node = 
             node.booksUnder <- node.booksUnder + 1
             printf "."
-            List.iter updateCounts node.broader
+            Seq.iter updateCounts node.broader
         for node in nodes do
             // Only add a book under a node if there's no narrower one.
             if not (List.exists (fun n -> isBroaderThan graph node.uri n.uri) nodes) then

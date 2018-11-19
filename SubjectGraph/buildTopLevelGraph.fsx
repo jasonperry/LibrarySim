@@ -17,7 +17,7 @@ let CSVFILE = "../bookdata/TopLevelIndex.csv"
 type LOCIndex = FSharp.Data.CsvProvider<CSVFILE, AssumeMissingValues=true>
 let index = LOCIndex.Load(CSVFILE)
 
-let theGraph = emptyGraph () 
+let theGraph = SubjectGraph.emptyGraph () 
 let mutable nodeCount = 0
 
 // TODO: addSubjectNode (uri, name, altnames, parents) - computes booksUnder from narrower

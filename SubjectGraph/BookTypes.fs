@@ -1,14 +1,8 @@
-/// This module might need to be the global data structures.
+/// Global types related to book records (including subject info).
 module BookTypes
 
 open CallNumber
 
-/// A lightweight URI wrapper to differentiate from strings. 
-/// Hides System.Uri.
-(* type BasicUri = Uri of string
-    with member this.Value = match this with (Uri s) -> s
-         member this.Wrapped = match this with (Uri s) -> "<" + s + ">"
-*)
 [<Struct>] // Will this make it more efficient? Measure!
 type SubjectInfo = {
   uri : System.Uri option;
