@@ -4,9 +4,9 @@
     <!-- If we omit this, it's a dll and has no EntryPoint. -->
     <OutputType>Exe</OutputType> 
     <!-- This determines which versions of the packages it will pull. -->
-    <TargetFramework>net461</TargetFramework>
+    <!-- <TargetFramework>net461</TargetFramework> -->
     <!-- <TargetFramework>netstandard2.0</TargetFramework> Not a runnable framework! -->
-    <!-- <TargetFramework>netcoreapp2.1</TargetFramework> -->
+    <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
   <!-- <ItemGroup>
     <PackageReference Include="RDFSharp" Version="1.0.1" /> 
@@ -18,14 +18,16 @@
     <Compile Include="BookTypes.fs" />
     <Compile Include="SparqlQuery.fs" />
     <Compile Include="SubjectGraph.fs" /> 
+    <Compile Include="BuildTopLevel.fs" />
+    <Compile Include="BuildClassGraph.fs" /> 
+    <Compile Include="BuildFromBooks.fs" />
+    <Compile Include="MarcXmlToBooks.fs" />
     <Compile Include="SubjectGraphAPI.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="3.0.0" />
+    <PackageReference Include="FsPickler" Version="5.2" />
     <PackageReference Include="Newtonsoft.JSON" Version="11.0.2" />
     <PackageReference Include="Suave" Version="2.5.2" />
-    <!-- <PackageReference Include="System.Runtime.Serialization.Formatters" Version="4.3.0" />
-    <PackageReference Include="BinaryFormatter" Version="2.1.4" />
-    <PackageReference Include="System.Xml.XDocument" Version="4.3.0" />  -->
   </ItemGroup>
 </Project>

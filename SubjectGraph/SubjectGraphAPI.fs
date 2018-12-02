@@ -10,6 +10,7 @@ open Newtonsoft.Json
 open BookTypes
 open SubjectGraph
 
+
 /// Immutable SubjectNode info returned by the API.
 type SubjectsResult = {
   thisSubject : SubjectInfo;
@@ -74,8 +75,32 @@ let dispatch g =
           path "/goodbye" >=> Successful.OK "Good bye POST" ] ]
 
 [<EntryPoint>]
-let main _ =
-  let theGraph = loadGraph "output/graph.sgb"
-  printfn "Loaded subject graph"
-  startWebServer defaultConfig (dispatch theGraph) //(Successful.OK "Hello, Suave!")
-  0
+let main argv =
+  match argv.[0] with 
+    | "buildClassGraph" -> 
+      BuildClassGraph.buildGraph argv.[1]
+      0
+    | "buildTopLevel" -> 
+      BuildTopLevel.buildGraph ()
+      0
+    | "buildGutenBooks" ->
+      MarcXmlToBooks.processBooks argv.[1]
+      0
+    | "buildGutenGraph" ->
+      // any way to detect if records.brb is up to date? Not bothering yet!
+      BuildFromBooks.buildGraph argv.[1]
+      0
+    | "browse" ->
+      printfn "Loading graph %s" argv.[1]
+      let graph = loadGraph argv.[1]
+      browseGraph graph
+      0
+    | "serve" -> 
+      let theGraph = loadGraph "output/graph.sgb"
+      printfn "Loaded subject graph"
+      startWebServer defaultConfig (dispatch theGraph) //(Successful.OK "Hello, Suave!")
+      0
+    | _ -> 
+      printfn "Unknown argument"
+      1
+      

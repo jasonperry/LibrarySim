@@ -1,31 +1,35 @@
-//#I __SOURCE_DIRECTORY__
+/// Create and serialize BookRecord list from a MarcXML catalog.
+module MarcXmlToBooks
+
+(* //#I __SOURCE_DIRECTORY__
 //#r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
 #I "C:\\Users\\Jason\\"
 #r ".nuget/packages/FSharp.Data/3.0.0/lib/net45/FSharp.Data.dll"
 #r "System.Xml.Linq.dll" // guess it's the net45 version.
 #r "obj/Debug/net461/SubjectGraph.exe"
 // #load "CallNumber.fs"
-// #load "BookRecord.fs" // These are in the built library now.
+// #load "BookRecord.fs" // These are in the built library now. *)
 
-open System.Collections.Generic (* Always need this for lists. *)
-open System.IO (* for file read and write *)
+open System.Collections.Generic // Always need this for lists.
+open System.IO // for file read and write 
 open FSharp.Data
+open System.Runtime.Serialization.Formatters.Binary
 
 open BookTypes
 open CallNumber
 
-if fsi.CommandLineArgs.Length < 2 then
+(* if fsi.CommandLineArgs.Length < 2 then
     printfn "Need MarcXML file argument"
     exit(1)
-let xmlfile = fsi.CommandLineArgs.[1]
-let recordsFileName = "output/records.brb"
+let xmlfile = fsi.CommandLineArgs.[1] *)
+
+let OUTDIR = @"C:\Users\Jason\code\LibrarySim\SubjectGraph\output\"
+let recordsFileName = OUTDIR + "gutenRecords.brb"
 
 /// Giving a constant file name initializes the type provider magic.
 type Marc21Slim = XmlProvider<"marcsample.xml"> 
 // it just adds an 's'!
-
 let log = printfn
-
 let getSubfieldString (datafield : Marc21Slim.Datafield) code = 
     (* Still awkward, but you can't return from a for loop. *)
     match Array.tryFindIndex (fun (sf : Marc21Slim.Subfield) -> 
@@ -80,7 +84,7 @@ let processRecords (data : Marc21Slim.Collection) =
                 let cn = (getSubfieldString datafield "a").Value
                 printfn "Call Number: %s" cn
                 try 
-                    lcCallNum <- Some (LCCN.Parse cn)
+                    lcCallNum <- Some (LCCN.parse cn)
                     lcLetters <- Some (lcCallNum.Value.letters)
                 with 
                     // If the call number is letters (gutenberg), detect and store.
@@ -114,17 +118,14 @@ let processRecords (data : Marc21Slim.Collection) =
     printfn "    %d with Dewey call numbers" withDeweyNum
     printfn "Generated %d book records" books.Count
     books
+let processBooks xmlfile = 
+    let allbooks = processRecords (Marc21Slim.Parse (File.ReadAllText xmlfile))
+    //let allbooks = processRecords (Marc21Slim.Load(xmlfile))
 
-let allbooks = processRecords (Marc21Slim.Parse (File.ReadAllText xmlfile))
-//let allbooks = processRecords (Marc21Slim.Load(xmlfile))
-
-/// save list of book records to disk
-open System.Runtime.Serialization.Formatters.Binary
-
-let formatter = BinaryFormatter()
-let stream = new FileStream(recordsFileName, FileMode.Create)
-formatter.Serialize(stream, allbooks)
-stream.Close()
-printfn "Wrote records to file %s" recordsFileName
-        (* printfn "Found tag %d" datafield.Tag *)
-// printfn "%A" (data.GetSample().Values)
+    let formatter = BinaryFormatter()
+    let stream = new FileStream(recordsFileName, FileMode.Create)
+    formatter.Serialize(stream, allbooks)
+    stream.Close()
+    printfn "Wrote records to file %s" recordsFileName
+            (* printfn "Found tag %d" datafield.Tag *)
+    // printfn "%A" (data.GetSample().Values)

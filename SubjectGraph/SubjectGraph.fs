@@ -92,7 +92,7 @@ module SubjectGraph =
     // look it up.
 
 let splitSubjectName (name : string) = 
-    name.Replace(" -- ", "--").Replace("--","-").Split(Array.ofList['-'])
+    name.Replace(" -- ", "--").Replace("--","-").Split([|'-'|])
     |> Array.filter (fun s -> s <> "")
     |> List.ofArray
 
@@ -358,17 +358,22 @@ let hello name =
 // deserialize. The opens are a hint that maybe this should go elsewhere.
 
 open System.IO // for file read and write 
-open System.Runtime.Serialization.Formatters.Binary
-
+open MBrace.FsPickler
 let loadGraph graphFileName = 
-    let booksFormatter = BinaryFormatter()
+    //let booksFormatter = BinaryFormatter()
+    let serializer = FsPickler.CreateBinarySerializer()
     let stream = new FileStream(graphFileName, FileMode.Open)
-    let bl = booksFormatter.Deserialize(stream)
+    //let graph = ZeroFormatterSerializer.Deserialize<SubjectGraph>(stream)
+    let graph = serializer.Deserialize<SubjectGraph>(stream)
     stream.Close()
-    bl :?> SubjectGraph
+    graph
 
 let saveGraph (graph: SubjectGraph) graphFileName = 
-    let graphFormatter = BinaryFormatter()
-    let stream = new FileStream(graphFileName, FileMode.Create)
-    graphFormatter.Serialize(stream, graph)
-    stream.Close()
+    let binarySerializer = FsPickler.CreateBinarySerializer()
+    //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
+    let pickle = binarySerializer.Pickle(graph)
+    let outfile = File.OpenWrite(graphFileName)
+    //stream.Write(ZeroFormatterSerializer.Serialize(graph), 0, 0)
+    outfile.Write(binarySerializer.Pickle(graph), 0, pickle.Length)
+    // graphFormatter.Serialize(stream, graph)
+    outfile.Close()

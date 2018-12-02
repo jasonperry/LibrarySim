@@ -1,8 +1,7 @@
-open System.IO.Compression
-open System.Threading
 /// Build a graph out of the LOC Class MarcXML dataset.
+module BuildClassGraph
 
-#I __SOURCE_DIRECTORY__
+(* #I __SOURCE_DIRECTORY__
 //#I @"C:\Users\Jason\code\LibrarySim\packages"
 #r @"C:\Users\Jason\.nuget/packages/FSharp.Data/3.0.0/lib/net45/FSharp.Data.dll" // version shouldn't matter.
 // #r @"C:\Users\Jason\code\LibrarySim\packages\FSharp.Core\4.5.2\lib\netstandard1.6\FSharp.Core.dll"
@@ -12,10 +11,10 @@ open System.Threading
 // #r @"C:\Users\Jason\code\LibrarySim\packages\binaryformatter\2.1.4\lib\netstandard1.1\BinaryFormatter.dll"
 // #r @"C:\Users\Jason\.nuget\packages\system.xml.xdocument\4.3.0\lib\netcore50\System.Xml.XDocument.dll"
 #r "obj/Debug/net461/SubjectGraph.exe"
-//#r "obj/Debug/netcoreapp2.1/SubjectGraph.dll"
+//#r "obj/Debug/netcoreapp2.1/SubjectGraph.dll" *)
 
 open System.Collections.Generic // Dictionary
-open System.IO (* for file read and write *)
+open System.IO // for file read and write 
 open System.IO.Compression
 open System.Xml
 open FSharp.Data
@@ -26,13 +25,17 @@ open SubjectGraph
 
 let outputGraphFileName = "output/ClassGraph.sgb"
 
-if fsi.CommandLineArgs.Length < 2 then
+(* if fsi.CommandLineArgs.Length < 2 then
     printfn "Need MarcXML.gz file argument"
     exit(1)
-let xmlfile = fsi.CommandLineArgs.[1]
+let xmlfile = fsi.CommandLineArgs.[1] *)
 
+[<Literal>]
+let DATADIR = @"C:\Users\Jason\code\LibrarySim\SubjectGraph\indexdata\"
+[<Literal>]
+let XMLSAMPLE = DATADIR + "MarcRecordSample.xml"
 /// Giving a constant file name initializes the type provider magic.
-type Marc21ClassRecord = XmlProvider<"MarcRecordSample.xml"> 
+type Marc21ClassRecord = XmlProvider<XMLSAMPLE> 
 
 let mutable nodeCount = 0
 
@@ -153,10 +156,10 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
     let mutable recordCount = 0
     let mutable withNoCallNum = 0
     let mutable callNumCount = 0
-    //for record in records do
-    let recEnum = records.GetEnumerator()
-    while recEnum.MoveNext() && recordCount < 20000 do 
-        let record = recEnum.Current
+    for record in records do
+        (*let recEnum = records.GetEnumerator()
+        while recEnum.MoveNext() && recordCount < 20000 do 
+        let record = recEnum.Current *)
         let mutable controlNumber = None
         let mutable cnRangeStr = None
         let subjectNames = new List<string>()
@@ -210,23 +213,22 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
 // Maybe it will obviate TopLevel Graph
 // If I only use this and not the LCSH, have to make up my own IRIs.
 
-// read in nodes
-
-let file = File.OpenRead(xmlfile)
-let instream = new StreamReader(new GZipStream(file, mode=CompressionMode.Decompress))
-let reader = XmlReader.Create(instream)
-reader.MoveToContent() // Can I avoid this or put it inside readRecords?
-
-try 
-    let theGraph = processClassRecords (readRecords reader)
-    SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
-    printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
-    reader.Close()
-    instream.Close()
-    // desperate attempt to reclaim memory before serialization.
-    npIndex.Clear()
-    System.GC.Collect()
-    saveGraph theGraph outputGraphFileName
-with 
-    | CallNumberError msg -> printfn "CallNumberError: %s" msg
-// Need to post-process graph, finding toplevel.
+let buildGraph gzfile = 
+    let file = File.OpenRead(gzfile)
+    let instream = new StreamReader(new GZipStream(file, mode=CompressionMode.Decompress))
+    let reader = XmlReader.Create(instream)
+    reader.MoveToContent() |> ignore // Can I avoid this or put it inside readRecords?
+    try 
+        let theGraph = processClassRecords (readRecords reader)
+        SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
+        printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
+        reader.Close()
+        instream.Close()
+        // desperate attempt to reclaim memory before serialization.
+        npIndex.Clear()
+        System.GC.Collect()
+        saveGraph theGraph outputGraphFileName
+        printfn "Class graph saved to %s" outputGraphFileName
+    with 
+        | CallNumberError msg -> printfn "CallNumberError: %s" msg
+    // Need to post-process graph, finding toplevel.
