@@ -227,7 +227,7 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
             Logger.Warning <| sprintf "%A" (List.map (fun (n:SubjectNode) -> n.name) parents)
         let newNode = { 
             uri = uri;
-            name = label; (* keep variant names in hash table *)
+            name = label; // keep variant names in hash table 
             subdividedName = splitSubjectName label
             callNumRange = if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
                                 Some (qres.results.[0].["callNum"])

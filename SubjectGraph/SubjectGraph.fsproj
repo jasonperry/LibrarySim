@@ -1,4 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Could I ad multiple project entries? -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- If we omit this, it's a dll and has no EntryPoint. -->

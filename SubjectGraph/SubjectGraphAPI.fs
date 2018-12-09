@@ -10,7 +10,6 @@ open Newtonsoft.Json
 open BookTypes
 open SubjectGraph
 
-
 /// Immutable SubjectNode info returned by the API.
 type SubjectsResult = {
   thisSubject : SubjectInfo;
@@ -28,6 +27,15 @@ module SubjectsResult =
       |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
       |> List.ofSeq;
   }
+  let toHtml (sr : SubjectsResult) = 
+    let makeSubjectInfoLink (si : SubjectInfo) = 
+      // TODO: find a way to get the app's own URL.
+      "<p><a href=\"http://127.0.0.1:8080/browse?uri=" 
+      + si.uri.Value.ToString() + "\">" + si.name + "</a></p>"
+    "<html><body>" + String.concat "" (List.map makeSubjectInfoLink sr.broader)
+      + "<h1>" + sr.thisSubject.name + "</h1>"  
+      + String.concat "" (List.map makeSubjectInfoLink sr.narrower) + "</body></html>"
+
   /// Construct a result object corresponding to the top level.
   let topLevel (g : SubjectGraph) = {
     thisSubject = {uri = None; name = "Top Level"};
@@ -57,19 +65,22 @@ let getSubjectResult g q =
       SubjectsResult.topLevel g
     else 
       SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
-  |> JsonConvert.SerializeObject
 
 let getBookResult (g: SubjectGraph) q = 
   defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
   |> fun uriStr -> BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
-  |> JsonConvert.SerializeObject
 
 let dispatch g =
   choose 
     [ GET >=> choose
-        [ 
-          path "/subject" >=> request (fun r -> Successful.OK (getSubjectResult g r.query))
-          path "/books" >=> request (fun r -> Successful.OK (getBookResult g r.query)) ]
+        [ // Need to setMimeType "text/html; charset=utf-8"
+          path "/subject" >=> request (fun r -> Successful.OK 
+                                                  (getSubjectResult g r.query
+                                                   |> JsonConvert.SerializeObject))
+          path "/books" >=> request (fun r -> Successful.OK (getBookResult g r.query
+                                                             |> JsonConvert.SerializeObject))
+          path "/browse" >=> request (fun r -> Successful.OK (getSubjectResult g r.query
+                                                              |> SubjectsResult.toHtml)) ]
       POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
           path "/goodbye" >=> Successful.OK "Good bye POST" ] ]

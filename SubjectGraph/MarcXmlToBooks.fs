@@ -30,8 +30,10 @@ let recordsFileName = OUTDIR + "gutenRecords.brb"
 type Marc21Slim = XmlProvider<"marcsample.xml"> 
 // it just adds an 's'!
 let log = printfn
+
+// Return the MARC subfield of the given letter, if it exists.
 let getSubfieldString (datafield : Marc21Slim.Datafield) code = 
-    (* Still awkward, but you can't return from a for loop. *)
+    // Still awkward, but you can't return from a for loop.
     match Array.tryFindIndex (fun (sf : Marc21Slim.Subfield) -> 
                               sf.Code.String = Some code)  
                              datafield.Subfields with
