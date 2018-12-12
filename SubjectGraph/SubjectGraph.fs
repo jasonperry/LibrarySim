@@ -7,6 +7,13 @@ open System.Collections.Generic
 open BookTypes
 open SparqlQuery
 
+/// Where to put this?
+let rec isStrictPrefix list1 list2 = 
+    match (list1, list2) with
+        | (_, []) -> false
+        | ([], y::ys) -> true
+        | (x::xs, y::ys) -> x = y && isStrictPrefix xs ys
+
 type SubjectNode = {
     uri : Uri;
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
@@ -20,15 +27,74 @@ type SubjectNode = {
     mutable booksUnder : int  // to keep a count
 }
 
+/// Utility functions for individual SubjectNodes.
 module SubjectNode =
     let isNarrower node1 node2 = 
-        let rec isPrefix l1 l2 = 
-            match (l1, l2) with 
-                | ([], _) -> true
-                | (x::xs, y::ys) -> x = y && isPrefix xs ys
-                | _ -> false
-        isPrefix node1.subdividedName node2.subdividedName
+        isStrictPrefix node1.subdividedName node2.subdividedName
     let isBroader n1 n2 = not (isNarrower n1 n2)
+    let joinSubjectName slist = List.reduce (fun l r -> l + "--" + r) slist
+    let splitSubjectName (name : string) = 
+        // The character '@' doesn't exist in the Guten or LOC Class datasets.
+        name.Replace(" -- ", "--").Replace("--","@").Split([|'@'|])
+        |> Array.filter (fun s -> s <> "")
+        |> List.ofArray
+
+/// A class with methods for finding subjects by prefix.
+type NamePrefixIndex = private {
+    theMap : Dictionary<string, List<SubjectNode>>
+} with 
+    static member Create () = { theMap = new Dictionary<string, List<SubjectNode>>() }
+    member this.FindExact subjList = 
+        try
+            List.ofSeq this.theMap.[List.head subjList]
+            |> List.find (fun nd -> List.tail nd.subdividedName = List.tail subjList)
+            |> Some
+        with 
+            | _ -> None
+    member this.Add node = 
+        // open List // local open would be nice.
+        let subjHead = List.head node.subdividedName
+        if not(this.theMap.ContainsKey(subjHead)) then
+            this.theMap.Add(subjHead, new List<_>())
+        this.theMap.[subjHead].Add(node)
+    member this.MaxPrefixMatch node =
+        let subjHead = List.head node.subdividedName
+        let subjTail = List.tail node.subdividedName
+        if not(this.theMap.ContainsKey(subjHead)) then None
+        else 
+            let matchCandidates = 
+                this.theMap.[subjHead]
+                |> Seq.filter (fun nd -> isStrictPrefix (List.tail nd.subdividedName) subjTail)
+            if Seq.isEmpty matchCandidates then None
+            else Seq.maxBy (fun nd -> nd.subdividedName.Length) matchCandidates
+                |> Some
+    /// Return a list of all nodes with names that are extensions of the given 
+    /// one.
+    member this.AllExtensions subdividedName = 
+        let subjHead = List.head subdividedName
+        let subjTail = List.tail subdividedName
+        if not(this.theMap.ContainsKey(subjHead)) then []
+        else
+            this.theMap.[subjHead]
+            |> Seq.filter (fun nd -> isStrictPrefix (subjHead::subjTail) nd.subdividedName)
+            |> List.ofSeq
+    /// Return a list of all nodes with names that are one segment longer than 
+    /// the given one.
+    member this.SingleExtensions subdividedName = 
+        let subjHead = List.head subdividedName
+        let subjTail = List.tail subdividedName
+        if not(this.theMap.ContainsKey(subjHead)) then []
+        else
+            this.theMap.[subjHead]
+            |> Seq.filter (fun nd -> 
+                List.length nd.subdividedName = (List.length subdividedName + 1)
+                && isStrictPrefix (subjHead::subjTail) nd.subdividedName)
+            |> List.ofSeq
+    member this.Iterate = seq { for item in this.theMap.Values do
+                                    yield! item }
+    /// Use this to avoid storing the index in a finished graph. (not as nice 
+    /// a solution as a new type or custom serialization.)
+    member this.Clear () = this.theMap.Clear()
 
 /// SubjectGraph record type.
 type SubjectGraph = {
@@ -37,17 +103,19 @@ type SubjectGraph = {
         // went back to immutable lists. Even broaders won't actually be added twice.
         cnIndex : Dictionary<string, SubjectNode list>;  // maybe not unique 
         subjectNameIndex : Dictionary<string, SubjectNode list>;
+        subjectPrefixIndex : NamePrefixIndex;
         // should be unique...hashset? Can we make out of BasicURI...yes.
         uriIndex : Dictionary<Uri, SubjectNode>; 
     } 
 
-/// Module to allow a private constructor, but doesn't have a working one yet.
+/// Functions relevant to the SubjectGraph data structure.
 module SubjectGraph = 
     let emptyGraph () =  { 
         // TODO: change to have a top node instead of a top level.
         topLevel = new List<_> (); // Later: read from pre-generated list.
         cnIndex = new Dictionary<_,_> ();
         subjectNameIndex = new Dictionary<_,_> ();
+        subjectPrefixIndex = NamePrefixIndex.Create ();
         uriIndex = new Dictionary<_,_> ()
     }
     /// Take a completed subject entry and update other graph structures with its information.
@@ -63,39 +131,53 @@ module SubjectGraph =
                     graph.topLevel.Add newNode
                 else 
                     Logger.Warning (sprintf "Complex subject %s not added" newNode.name) *)
+        // ...and parents of all its children.
+        // TODO: "stretching" - remove direct grandparent-grandchild relationships.
+        for node in newNode.narrower do 
+            node.broader.Add newNode
         // 2. Add key and value to subject name index. TODO: add variants.
         if not (graph.subjectNameIndex.ContainsKey newNode.name) then
             graph.subjectNameIndex.Add (newNode.name, [newNode])
         else
             // It's OK just to append because we know it's a new node.
             graph.subjectNameIndex.[newNode.name] <- (newNode :: graph.subjectNameIndex.[newNode.name])
+        // 3. Add to the subject prefix index.
+        graph.subjectPrefixIndex.Add newNode
         // 3. Add the new subject URI to that index.
         graph.uriIndex.Add(newNode.uri, newNode)
         // 4. If subject has a call number, add that to the index.
-        // NOT APPROPRIATE if it's just letters. TODO: add test.
-        (*if newNode.callNumRange.IsSome then // res.ContainsKey "callNum" then
-            let cn = newNode.callNumRange.Value
-            if graph.cnIndex.ContainsKey cn then
-                graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
-            else graph.cnIndex.Add (cn, [newNode]) *)
+        // NOT APPROPRIATE if it's just letters, but doing it anyway. They'll have long lists.
+        match newNode.callNumRange with 
+            | Some cn -> 
+                if graph.cnIndex.ContainsKey cn then
+                    graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
+                else graph.cnIndex.Add (cn, [newNode])
+            | None -> ()
     /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
     let makeTopLevel graph = 
         for node in graph.uriIndex.Values do
             if node.broader.Count = 0 then
                 graph.topLevel.Add(node)
+    /// Probably more efficient than maintaining the prefixIndex, but not sufficient.
+    let findLongestPrefixSubj graph (splitSubj : string list) = 
+        let rec findit slist = 
+            match slist with 
+                | [] -> []
+                | slist -> 
+                    let label = SubjectNode.joinSubjectName slist
+                    if graph.subjectNameIndex.ContainsKey label then
+                        graph.subjectNameIndex.[label]
+                    else findit slist.[..List.length slist - 1]
+        findit splitSubj
+/// Return true if list1 is a strict prefix of list2 (not equal).
+
 (* ***************************************************************** *)
 
 /// Currently done in a script, but may come back here.
 //let buildTopLevelLOC = 
     // read in LCC subjects from file (into map?)
     // look it up.
-
-let splitSubjectName (name : string) = 
-    name.Replace(" -- ", "--").Replace("--","-").Split([|'-'|])
-    |> Array.filter (fun s -> s <> "")
-    |> List.ofArray
-
 let getVariantLabels subj = []
 
 /// Return true if 1st URI is higher in the graph than the 2nd.
@@ -180,9 +262,10 @@ let newSubjectUri (graph: SubjectGraph) label callLetters =
     // call num then five digits? count backwards?
     Uri <| "http://knowledgeincoding.net/classif/" + (callLetters |? "XX") + label
 
-/// Add a heading record and all its broader subjects to the graph.
+/// Take a subject label and optional call number, and attempt to find its
+///   place in the graph.
 /// Modifies the graph and returns a node option with the new or found node.
-let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : string option) =
+let rec addSubject (graph: SubjectGraph) (label: string) (callLetters : string option) =
     // TODO: get more clear about when/how to clean the label.
     let label = label.Replace("\"", "\\\"")
     // 1. Try to get LCSH record for the subject label.
@@ -198,13 +281,20 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
     // 3. Build a new node.
     else 
         Logger.Info <| "Building new subject node for " + label
+        let subdividedName = SubjectNode.splitSubjectName label
+        // Make a URI for the subject, either from LCSH or our own generation scheme.
         let uri = 
             if (not qres.results.IsEmpty) then 
                 Uri qres.results.[0].["subj"]
             else 
                 newSubjectUri graph label callLetters
+        // Attempt to find the best parent node(s).
         let parents = 
-            if callLetters.IsSome && graph.cnIndex.ContainsKey callLetters.Value then
+            // First, look for a shorter version of a complex subject
+            let prefixParents = SubjectGraph.findLongestPrefixSubj graph subdividedName
+            if not (List.isEmpty prefixParents) then
+                prefixParents
+            elif callLetters.IsSome && graph.cnIndex.ContainsKey callLetters.Value then
                 // TODO: may want to do "chopping off" to get more depth
                 graph.cnIndex.[callLetters.Value]
             // Code to use LCSH broader for parents if no call number subject found;
@@ -225,15 +315,22 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
         if parents.Length > 5 then
             Logger.Warning <| "Subject has " + string(parents.Length) + " direct parents."
             Logger.Warning <| sprintf "%A" (List.map (fun (n:SubjectNode) -> n.name) parents)
+        // Get list of node's children. If there are no single-extension 
+        // subjects, take them all and later they'll get "wedged between"
+        let children = 
+            match graph.subjectPrefixIndex.SingleExtensions subdividedName with
+                | [] -> graph.subjectPrefixIndex.AllExtensions subdividedName
+                | extns -> extns
         let newNode = { 
             uri = uri;
             name = label; // keep variant names in hash table 
-            subdividedName = splitSubjectName label
-            callNumRange = if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
-                                Some (qres.results.[0].["callNum"])
-                           else callLetters;
+            subdividedName = subdividedName
+            callNumRange = 
+                if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
+                    Some (qres.results.[0].["callNum"])
+                else callLetters;
             broader = new List<SubjectNode>(parents);
-            narrower = new List<SubjectNode>(); 
+            narrower = new List<SubjectNode>(children); 
             books = new List<BookRecord>();
             booksUnder = 0
         }
@@ -249,7 +346,7 @@ let rec addSubjectByCN (graph: SubjectGraph) (label: string) (callLetters : stri
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
     // Try to add a subject for each name, get node back 
     let nodes = book.Subjects
-                |> List.map (fun subj -> addSubjectByCN graph subj.name book.LCLetters) 
+                |> List.map (fun subj -> addSubject graph subj.name book.LCLetters) 
                 |> List.choose id
     Logger.Info <| "Finished adding subjects for book \"" + book.Title + "\""
     // If we're storing books too, add it and update the counts

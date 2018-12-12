@@ -20,7 +20,7 @@
     <Compile Include="SparqlQuery.fs" />
     <Compile Include="SubjectGraph.fs" /> 
     <Compile Include="BuildTopLevel.fs" />
-    <Compile Include="BuildClassGraph.fs" /> 
+    <Compile Include="BuildLCClassGraph.fs" /> 
     <Compile Include="BuildFromBooks.fs" />
     <Compile Include="MarcXmlToBooks.fs" />
     <Compile Include="SubjectGraphAPI.fs" />

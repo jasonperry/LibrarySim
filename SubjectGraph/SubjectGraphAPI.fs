@@ -129,8 +129,8 @@ let dispatch g =
 [<EntryPoint>]
 let main argv =
   match argv.[0] with 
-    | "buildClassGraph" -> 
-      BuildClassGraph.buildGraph argv.[1]
+    | "buildLCClassGraph" -> 
+      BuildLCClassGraph.buildGraph argv.[1]
       0
     | "buildTopLevel" -> 
       BuildTopLevel.buildGraph ()

@@ -1,5 +1,5 @@
 /// Build a graph out of the LOC Class MarcXML dataset.
-module BuildClassGraph
+module BuildLCClassGraph
 
 (* #I __SOURCE_DIRECTORY__
 //#I @"C:\Users\Jason\code\LibrarySim\packages"
@@ -39,57 +39,6 @@ type Marc21ClassRecord = XmlProvider<XMLSAMPLE>
 
 let mutable nodeCount = 0
 
-
-/// Return true if list1 is a strict prefix of list2 (not equal).
-let rec isPrefix list1 list2 = 
-    match (list1, list2) with
-        | (_, []) -> false
-        | ([], y::ys) -> true
-        | (x::xs, y::ys) -> x = y && isPrefix xs ys
-
-/// A class with methods for finding subjects by prefix.
-/// Q: Should it become part of a graph? Maybe stored externally for when needed?
-type NamePrefixIndex = private {
-    theMap : Dictionary<string, List<SubjectNode>>
-}
-    with static member Create () = { theMap = new Dictionary<string, List<SubjectNode>>() }
-         member this.FindExact subjList = 
-            try
-                List.ofSeq this.theMap.[List.head subjList]
-                |> List.find (fun nd -> List.tail nd.subdividedName = List.tail subjList)
-                |> Some
-            with 
-                | _ -> None
-         member this.Add node = 
-            // open List // local open would be nice.
-            let subjHead = List.head node.subdividedName
-            if not(this.theMap.ContainsKey(subjHead)) then
-                this.theMap.Add(subjHead, new List<_>())
-            this.theMap.[subjHead].Add(node)
-         member this.MaxPrefixMatch node =
-            let subjHead = List.head node.subdividedName
-            let subjTail = List.tail node.subdividedName
-            if not(this.theMap.ContainsKey(subjHead)) then None
-            else 
-                let matchCandidates = 
-                    this.theMap.[subjHead]
-                    |> Seq.filter (fun nd -> isPrefix (List.tail nd.subdividedName) subjTail)
-                if Seq.isEmpty matchCandidates then None
-                else Seq.maxBy (fun nd -> nd.subdividedName.Length) matchCandidates
-                    |> Some
-         member this.AllExtensions node = 
-            let subjHead = List.head node.subdividedName
-            let subjTail = List.tail node.subdividedName
-            if not(this.theMap.ContainsKey(subjHead)) then []
-            else
-                this.theMap.[subjHead]
-                |> Seq.filter (fun nd -> isPrefix (subjHead::subjTail) nd.subdividedName)
-                |> List.ofSeq
-         member this.iterate = seq { for item in this.theMap.Values do
-                                         yield! item }
-         /// to free up memory.
-         member this.Clear () = this.theMap.Clear()
-
 let npIndex = NamePrefixIndex.Create()
 
 /// Populate a CN-based subject node's parents and children, then add to graph.
@@ -102,7 +51,8 @@ let insertNode (graph: SubjectGraph) node =
             npIndex.Add node
             // assume each node added just once, so no add..TEST IT
             let parent =  npIndex.MaxPrefixMatch(node)
-            let children = npIndex.AllExtensions(node)
+            // but will it 'wedge in'?? Number of children should be *reduced* as it goes along.
+            let children = npIndex.AllExtensions(node.subdividedName) 
             // Add parent and (don't) add this node as a child of parents.
             match parent with 
                 | Some pnode -> 
@@ -192,7 +142,7 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
         else 
             insertNode theGraph {
                 uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber.Value);
-                name = Seq.reduce (fun l r -> l + "--" + r) subjectNames; 
+                name = SubjectNode.joinSubjectName (List.ofSeq subjectNames); 
                 subdividedName = List.ofSeq subjectNames;
                 callNumRange = cnRangeStr;
                 broader = new List<SubjectNode>(); 

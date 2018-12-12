@@ -33,7 +33,7 @@ let buildGraph () =
         let node = {
             uri = System.Uri row.URI
             name = subjName
-            subdividedName = splitSubjectName subjName
+            subdividedName = SubjectNode.splitSubjectName subjName
             callNumRange = if row.``Call Num`` = "" then None
                            else Some row.``Call Num``
             // should throw if parents don't exist (haven't been added)
