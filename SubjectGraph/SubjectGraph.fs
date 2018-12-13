@@ -120,27 +120,26 @@ module SubjectGraph =
     }
     /// Take a completed subject entry and update other graph structures with its information.
     let addNode graph (newNode: SubjectNode) = 
-        // 1. Add it as children of all its parents.
+        // Remove links that this node will go between.
+        for gp in newNode.broader do
+            for gc in newNode.narrower do
+                if gc.broader.Contains gp then
+                    gc.broader.Remove gp |> ignore
+                    gp.narrower.Remove gc |> ignore // it better be there!
+        // Add backlinks: as children of all its parents,
         for node in newNode.broader do
             node.narrower.Add newNode
-        (* if newNode.broader.IsEmpty then
-            // check if it was already added 
-            if not (graph.uriIndex.ContainsKey newNode.uri) then
-                // Temp: don't add complex nodes with no broader
-                if res.["complex"] = "false" then 
-                    graph.topLevel.Add newNode
-                else 
-                    Logger.Warning (sprintf "Complex subject %s not added" newNode.name) *)
         // ...and parents of all its children.
-        // TODO: "stretching" - remove direct grandparent-grandchild relationships.
         for node in newNode.narrower do 
             node.broader.Add newNode
-        // 2. Add key and value to subject name index. TODO: add variants.
+        // Add key and value to subject name index. TODO: add variants.
         if not (graph.subjectNameIndex.ContainsKey newNode.name) then
             graph.subjectNameIndex.Add (newNode.name, [newNode])
         else
-            // It's OK just to append because we know it's a new node.
-            graph.subjectNameIndex.[newNode.name] <- (newNode :: graph.subjectNameIndex.[newNode.name])
+            // It's OK just to append because we won't call this on a node
+            // that's already in the graph.
+            graph.subjectNameIndex.[newNode.name] <- 
+                (newNode :: graph.subjectNameIndex.[newNode.name])
         // 3. Add to the subject prefix index.
         graph.subjectPrefixIndex.Add newNode
         // 3. Add the new subject URI to that index.
@@ -295,7 +294,7 @@ let rec addSubject (graph: SubjectGraph) (label: string) (callLetters : string o
             if not (List.isEmpty prefixParents) then
                 prefixParents
             elif callLetters.IsSome && graph.cnIndex.ContainsKey callLetters.Value then
-                // TODO: may want to do "chopping off" to get more depth
+                // TODO: find "narrowest call range above"...
                 graph.cnIndex.[callLetters.Value]
             // Code to use LCSH broader for parents if no call number subject found;
             //   currently disabled.
@@ -318,6 +317,7 @@ let rec addSubject (graph: SubjectGraph) (label: string) (callLetters : string o
         // Get list of node's children. If there are no single-extension 
         // subjects, take them all and later they'll get "wedged between"
         let children = 
+            // TODO: replace with just "nearest extensions"
             match graph.subjectPrefixIndex.SingleExtensions subdividedName with
                 | [] -> graph.subjectPrefixIndex.AllExtensions subdividedName
                 | extns -> extns
@@ -460,7 +460,6 @@ let loadGraph graphFileName =
     //let booksFormatter = BinaryFormatter()
     let serializer = FsPickler.CreateBinarySerializer()
     let stream = new FileStream(graphFileName, FileMode.Open)
-    //let graph = ZeroFormatterSerializer.Deserialize<SubjectGraph>(stream)
     let graph = serializer.Deserialize<SubjectGraph>(stream)
     stream.Close()
     graph
@@ -468,6 +467,7 @@ let loadGraph graphFileName =
 let saveGraph (graph: SubjectGraph) graphFileName = 
     let binarySerializer = FsPickler.CreateBinarySerializer()
     //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
+    graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
     let pickle = binarySerializer.Pickle(graph)
     let outfile = File.OpenWrite(graphFileName)
     //stream.Write(ZeroFormatterSerializer.Serialize(graph), 0, 0)
