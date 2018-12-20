@@ -41,19 +41,26 @@ let mutable nodeCount = 0
 
 let npIndex = NamePrefixIndex.Create()
 
-/// Populate a CN-based subject node's parents and children, then add to graph.
+/// Populate a Classification subject node's parents and children, then add to graph.
+/// NOW no longer populating. 
 let insertNode (graph: SubjectGraph) node = 
     match npIndex.FindExact(node.subdividedName) with 
         | Some exactMatch -> 
             printfn "Subject %A already in index" node.name 
             exactMatch
         | None -> 
-            npIndex.Add node
+            SubjectGraph.insertNode graph node 
+            node
+            (* npIndex.Add node
             // assume each node added just once, so no add..TEST IT
             let parent =  npIndex.MaxPrefixMatch(node)
             // but will it 'wedge in'?? Number of children should be *reduced* as it goes along.
-            let children = npIndex.AllExtensions(node.subdividedName) 
-            // Add parent and (don't) add this node as a child of parents.
+            let children = // OR just take existing children of parent? might be none.
+                npIndex.MinExtensions node.subdividedName
+                //let ch1 = npIndex.SingleExtensions node.subdividedName
+                //if not ch1.IsEmpty then ch1
+                //else npIndex.AllExtensions(node.subdividedName) 
+            // Add parent
             match parent with 
                 | Some pnode -> 
                     node.broader.Add(pnode)
@@ -61,9 +68,9 @@ let insertNode (graph: SubjectGraph) node =
                 | None -> ()
             // Add children and (don't) add this node as a parent of children.
             node.narrower.AddRange(children)
-            //Seq.iter (fun nd -> nd.broader.Add(node)) children
-            SubjectGraph.addNode graph node 
-            node
+            // Let the Subject Graph code "wire up" everything else
+            SubjectGraph.insertNode graph node 
+            node *)
             // ?? Should I temporarily add to top-level, then remove?
             // ...no...how about add a flag to the node to indicate orphan?
             //  current solution: just find the top level in post-processing.
@@ -116,11 +123,33 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
         callNumCount <- 0
         for datafield in record.Datafields do
             if datafield.Tag = 10 then
+                // TODO: remove the space in the control number.
                 controlNumber <- getSingleSubfield datafield "a"
+                // debug for the "Arizona problem"
+                if controlNumber.Value = "CF 94087466" then
+                    Logger.Info "^^^ Adding Arizona"
+                elif controlNumber.Value = "CF 99431990" then
+                    Logger.Info "^^^ Adding Arizona child"
+                elif controlNumber.Value = "CF 94087639" then
+                    Logger.Info "^^^ Adding Arizona greatgrandchild"
+                elif controlNumber.Value = "CF 99432215" then
+                    Logger.Info "^^^ Adding Arizona grandchild"
+                else ()
             if datafield.Tag = 153 then
                 // Some have alt call numbers at "c"
-                let lcCallNumStart = getSingleSubfield datafield "a"
-                let lcCallNumEnd = getSingleSubfield datafield "c"
+                let tableField = getSingleSubfield datafield "z"
+                let lcCallNumStart = // Option.lift2 (+) tableField (getSingleSubfield datafield "a")
+                    match getSingleSubfield datafield "a" with 
+                        | None -> None
+                        | Some a -> match tableField with
+                                    | None -> Some a
+                                    | Some z -> Some (z+a)
+                let lcCallNumEnd = // getSingleSubfield datafield "c"
+                    match getSingleSubfield datafield "c" with 
+                        | None -> None
+                        | Some c -> match tableField with
+                                    | None -> Some c
+                                    | Some z -> Some (z+c)
                 cnRangeStr <- 
                     // TODO: Monadize
                     match lcCallNumStart with 
@@ -150,6 +179,9 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
                 books = new List<BookRecord>();
                 booksUnder = 0
             } |> ignore
+            // tried this way, not what we want...
+            (* SubjectGraph.addSubject theGraph (SubjectNode.joinSubjectName (List.ofSeq subjectNames)) cnRangeStr
+            |> ignore *)
         recordCount <- recordCount + 1
         if recordCount % 1111 = 0 then 
             printfn "============= %d\n%A\n" recordCount subjectNames

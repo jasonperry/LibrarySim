@@ -19,6 +19,7 @@ type SubjectsResult = {
   thisSubject : SubjectInfo;
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
+  cnRange : string;
   booksUnder : int
 }
 module SubjectsResult = 
@@ -31,6 +32,7 @@ module SubjectsResult =
     narrower = node.narrower 
       |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
       |> List.ofSeq;
+    cnRange = defaultArg node.callNumRange ""
     booksUnder = node.booksUnder
   }
   let toHtml (sr : SubjectsResult) = 
@@ -44,7 +46,8 @@ module SubjectsResult =
      else
          "Up: " + (String.concat " " (List.map makeSubjectInfoLink sr.broader)))
     + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
-    + "<p>Entries under this heading: " + (string sr.booksUnder) + "</p>"
+    + "<p>Call number range: " + sr.cnRange + "<br />"
+    + "Entries under this heading: " + (string sr.booksUnder) + "</p>"
     + String.concat "<br />" (List.map makeSubjectInfoLink sr.narrower)
 
   /// Construct a result object corresponding to the top level.
@@ -56,6 +59,7 @@ module SubjectsResult =
       narrower = topSubjects
         |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
       booksUnder = List.sumBy (fun (nd : SubjectNode) -> nd.booksUnder) topSubjects
+      cnRange = "A-Z"
     }
 
 // TODO: monadize the error handling.  -> WebResult string

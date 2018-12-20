@@ -41,17 +41,26 @@ type SparqlResult = {
                                 |> Map.ofSeq )
                                resultlist 
         }
+    static member Empty =
+        { vars = []; results = [] }
 
 /// The boilerplate for sending a query. TODO: handle connection errors
 /// System.Net.WebException
 let sparqlQuery (queryString : string) = 
+    // Backslash escape to try to prevent a parse error. .Replace(@"\", @"\\"). Bad idea!
     // System.Web.HttpUtility worked before. Ah well.
-    let url = endpoint + "?query=" + System.Net.WebUtility.UrlEncode(queryString)
+    let url = endpoint + "?query="
+              + System.Net.WebUtility.UrlEncode(queryString)
     let req = HttpWebRequest.Create(url) :?> HttpWebRequest
     req.Method <- "GET" (* Probably the default. *)
     req.ContentType <- "application/x-www-form-urlencoded"
-    let resp = req.GetResponse() :?> HttpWebResponse
-    let stream = resp.GetResponseStream ()
-    let reader = new StreamReader(stream) 
-    SparqlResult.FromXml (reader.ReadToEnd())
-    (* parse to list of results, each with dict of variables with list of bindings?*)
+    try
+        let resp = req.GetResponse() :?> HttpWebResponse
+        let stream = resp.GetResponseStream ()
+        let reader = new StreamReader(stream) 
+        SparqlResult.FromXml (reader.ReadToEnd())
+    with 
+    | ex -> 
+        Logger.Error <| "SPARQL Query failed with: " + ex.Message
+        SparqlResult.Empty
+
