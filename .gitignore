@@ -228,3 +228,4 @@ SubjectGraph/output
 FableTest/
 SubjectGraph/indexdata/TopLevelIndex.csv
 SubjectGraph/logs
+SubjectGraph/indexdata/arizonaLC.xml.gz

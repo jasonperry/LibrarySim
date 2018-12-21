@@ -74,6 +74,7 @@ module LCCN =
         && cn1.decimal = cn2.decimal && cn1.cutter1 = cn2.cutter1
         && cn1.cutter2 = cn2.cutter2
     /// True if first call number is more specific but otherwise equal. Equal is false.
+    /// TODO: Should not be needed, in the ideal domain model.
     let moreSpecific cn1 cn2 = 
         cn1.letters = cn2.letters && cn1.number = cn2.number 
         && (cn1.decimal.IsSome && cn2.decimal.IsNone    // can short-circuit here
@@ -109,6 +110,6 @@ module CNRange = // nice if it could be a functor over types of CNs...
             raise  (CallNumberError "Could not parse CN range")
     let contains range cn =       // range.contains cn
         range.startCN <= cn && cn <= range.endCN
-    let isSubRange range1 range2 = 
-        contains range2 range1.startCN && contains range2 range1.endCN
+    let isSubRange subrange range = 
+        contains range subrange.startCN && contains range subrange.endCN
 

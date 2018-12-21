@@ -167,13 +167,16 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
                 callNumCount <- callNumCount + 1
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
-            printfn "** No call number entry (153) or string for record %s" controlNumber.Value
+            Logger.Error <| "No call number entry (153) or string for record " + controlNumber.Value
+        elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Table for") then
+            // TODO: just try to parse the CN here, and skip if it fails.
+            Logger.Info <| "Skipping 'table for' entry " + (defaultArg controlNumber "")
         else 
             insertNode theGraph {
                 uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber.Value);
                 name = SubjectNode.joinSubjectName (List.ofSeq subjectNames); 
                 subdividedName = List.ofSeq subjectNames;
-                callNumRange = cnRangeStr;
+                callNumRange = cnRangeStr; // TODO: parse here.
                 broader = new List<SubjectNode>(); 
                 narrower = new List<SubjectNode>();
                 books = new List<BookRecord>();

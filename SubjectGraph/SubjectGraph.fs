@@ -168,7 +168,8 @@ module SubjectGraph =
                         graph.subjectNameIndex.[label]
                     else findit slist.[..List.length slist - 2]
         findit splitSubj
-    /// Take a completed subject entry and update other graph structures with its information.
+    /// Take a completed subject entry and update the graph structure.
+    /// TODO: different ones: insertNodeByCN, insertNodeBySubdividedSubject
     let insertNode graph (newNode: SubjectNode) = 
         // TODO? Check if already in index, since this function is doing the work now?
         // Remove links that this node will go between.
@@ -214,7 +215,7 @@ module SubjectGraph =
             for child in parent.narrower do
                 // printfn "comparing %s *to*\n     %s" child.name newNode.name
                 if SubjectNode.isNarrower child newNode then
-                    printfn "re-parenting child node %s" child.name
+                    // printfn "re-parenting child node %s" child.name
                     // newNode.narrower.Add child  // should already be there
                     removeFromParentNarrower.Add child
                     child.broader.Remove parent |> ignore
