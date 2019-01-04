@@ -18,6 +18,13 @@ let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                  + "( [0-9]{4}[a-z]?)?"     // g7: year
                  + "( [Vv]\.[0-9]+| [Cc]\.[0-9]+| [Pp]t\.[0-9]+| suppl.)?$" // g8: misc
 
+/// Regex for prefixes of legal call numbers, used in the Class dataset
+let LCCN_PARTIAL_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
+                         + "( ?([0-9]{1,5})"        // g2: rest, g3: number
+                         + "(\.[0-9]{1,4})? ?"      // g4: decimal
+                         + "(\.[A-Z][0-9]{0,5})"   //  g5: cutter1 (maybe no number)
+                         + " ?([A-Z][0-9]{0,4})?)?" // g6: cutter2 (maybe no number)
+
 // If a string doesn't parse as LCCN, see if it looks like just the letters part (gutenberg)
 let isCNLetters s = 
     let isAlpha c = 'A' <= c && c <= 'z'
@@ -67,7 +74,7 @@ module LCCN =
                        else Some (groups.[8].[1..]) 
             }
         else
-            raise (CallNumberError "Could not parse LOC Call Number")
+            raise <| CallNumberError ("Could not parse LOC Call Number " + cnString)
     /// True if two call numbers are the same except for year and misc.
     let sameTitle cn1 cn2 = 
         cn1.letters = cn2.letters && cn1.number = cn2.number
@@ -107,7 +114,8 @@ module CNRange = // nice if it could be a functor over types of CNs...
             {startCN = LCCN.parse cnStrings.[0]; 
              endCN = LCCN.parse cnStrings.[0]}
         else 
-            raise  (CallNumberError "Could not parse CN range")
+            raise <| CallNumberError 
+                     ("Wrong number of segments forCN range" + string(Array.length cnStrings))
     let contains range cn =       // range.contains cn
         range.startCN <= cn && cn <= range.endCN
     let isSubRange subrange range = 

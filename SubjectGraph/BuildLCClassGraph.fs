@@ -31,7 +31,7 @@ let outputGraphFileName = "output/ClassGraph.sgb"
 let xmlfile = fsi.CommandLineArgs.[1] *)
 
 [<Literal>]
-let DATADIR = @"C:\Users\Jason\code\LibrarySim\SubjectGraph\indexdata\"
+let DATADIR = @"./indexdata/"
 [<Literal>]
 let XMLSAMPLE = DATADIR + "MarcRecordSample.xml"
 /// Giving a constant file name initializes the type provider magic.
@@ -126,7 +126,7 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
                 // TODO: remove the space in the control number.
                 controlNumber <- getSingleSubfield datafield "a"
                 // debug for the "Arizona problem"
-                if controlNumber.Value = "CF 94087466" then
+                (*if controlNumber.Value = "CF 94087466" then
                     Logger.Info "^^^ Adding Arizona"
                 elif controlNumber.Value = "CF 99431990" then
                     Logger.Info "^^^ Adding Arizona child"
@@ -134,7 +134,7 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
                     Logger.Info "^^^ Adding Arizona greatgrandchild"
                 elif controlNumber.Value = "CF 99432215" then
                     Logger.Info "^^^ Adding Arizona grandchild"
-                else ()
+                else () *)
             if datafield.Tag = 153 then
                 // Some have alt call numbers at "c"
                 let tableField = getSingleSubfield datafield "z"
@@ -176,7 +176,18 @@ let processClassRecords (records : Marc21ClassRecord.Record seq) =
                 uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber.Value);
                 name = SubjectNode.joinSubjectName (List.ofSeq subjectNames); 
                 subdividedName = List.ofSeq subjectNames;
-                callNumRange = cnRangeStr; // TODO: parse here.
+                cnString = cnRangeStr; 
+                callNumRange = 
+                    if Option.isSome cnRangeStr then
+                        // TODO: handle exceptions (I want to see them for now)
+                        try 
+                            Some (CNRange.parse cnRangeStr.Value)
+                        with
+                            | CallNumberError errstr -> 
+                                printfn "Error with CNRange #%d: %s" recordCount errstr 
+                                None
+                    else 
+                        None;
                 broader = new List<SubjectNode>(); 
                 narrower = new List<SubjectNode>();
                 books = new List<BookRecord>();

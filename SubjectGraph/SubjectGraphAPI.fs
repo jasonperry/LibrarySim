@@ -32,7 +32,7 @@ module SubjectsResult =
     narrower = node.narrower 
       |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
       |> List.ofSeq;
-    cnRange = defaultArg node.callNumRange ""
+    cnRange = defaultArg node.cnString ""
     booksUnder = node.booksUnder
   }
   let toHtml (sr : SubjectsResult) = 

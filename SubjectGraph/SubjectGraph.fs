@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 
 open BookTypes
+open CallNumber
 open SparqlQuery
 
 /// Where to put this?
@@ -18,7 +19,8 @@ type SubjectNode = {
     uri : Uri;
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
     subdividedName : string list;
-    callNumRange : string option;
+    callNumRange : LCCNRange option; // string option;
+    cnString : string option; // just as a backup
     // no explicit refs needed for these, F# uses reference semantics 
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
     broader : List<SubjectNode>; // SubjectNode list;  So sad, had to make it mutable...
@@ -241,11 +243,13 @@ module SubjectGraph =
         graph.uriIndex.Add(newNode.uri, newNode)
         // 4. If subject has a call number, add that to the index.
         // NOT APPROPRIATE if it's just letters, but doing it anyway. They'll have long lists.
+        // Temp change 12/24: pulling out just letters from parsed CNRange.
         match newNode.callNumRange with 
             | Some cn -> 
-                if graph.cnIndex.ContainsKey cn then
-                    graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
-                else graph.cnIndex.Add (cn, [newNode])
+                let letters = cn.startCN.letters
+                if graph.cnIndex.ContainsKey letters then
+                    graph.cnIndex.[letters] <- newNode :: graph.cnIndex.[letters]
+                else graph.cnIndex.Add (letters, [newNode])
             | None -> ()
     /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
@@ -368,14 +372,20 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
                 // I'd like to have a count of how many weren't found in LCSH...
                 Logger.Info <| "Subject label " + label + " not found in LCSH"
                 newSubjectUri graph label callLetters
+        let cnString = 
+            if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
+                    Some (qres.results.[0].["callNum"])
+                else callLetters
         let newNode = { 
             uri = uri;
             name = label; // keep variant names in hash table 
             subdividedName = subdividedName
+            cnString = cnString;
             callNumRange = 
-                if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
-                    Some (qres.results.[0].["callNum"])
-                else callLetters;
+                if Option.isSome cnString then
+                    Some (CNRange.parse cnString.Value)
+                else 
+                    None
             broader = new List<SubjectNode>(); // (parents);
             narrower = new List<SubjectNode>(); //(children); 
             books = new List<BookRecord>();

@@ -14,7 +14,7 @@ open System.Collections.Generic
 open BookTypes
 let graphFileName = "output/TopLevelIndex.sgb"
 [<Literal>] 
-let DATADIR = @"C:\Users\Jason\code\LibrarySim\SubjectGraph\indexdata\"
+let DATADIR = @"/home/jperry/code/LibrarySim/SubjectGraph/indexdata/"
 [<Literal>]
 let CSVFILE = DATADIR + "TopLevelIndex.csv" //"../bookdata/TopLevelIndex.csv"
 
@@ -34,8 +34,9 @@ let buildGraph () =
             uri = System.Uri row.URI
             name = subjName
             subdividedName = SubjectNode.splitSubjectName subjName
-            callNumRange = if row.``Call Num`` = "" then None
+            cnString = if row.``Call Num`` = "" then None
                            else Some row.``Call Num``
+            callNumRange = None
             // should throw if parents don't exist (haven't been added)
             broader = new List<_> (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
             narrower = new List<SubjectNode>()
@@ -53,8 +54,8 @@ let buildGraph () =
                     node :: theGraph.subjectNameIndex.[label] 
             else
                 theGraph.subjectNameIndex.Add(label, [node])
-        if node.callNumRange.IsSome then
-            let cn = node.callNumRange.Value
+        if node.cnString.IsSome then
+            let cn = node.cnString.Value
             if theGraph.cnIndex.ContainsKey(cn) then
                 printfn "Warning: call number '%s' already exists" cn
                 theGraph.cnIndex.[cn] <- node :: theGraph.cnIndex.[cn]

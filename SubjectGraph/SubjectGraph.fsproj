@@ -5,9 +5,9 @@
     <!-- If we omit this, it's a dll and has no EntryPoint. -->
     <OutputType>Exe</OutputType> 
     <!-- This determines which versions of the packages it will pull. -->
-    <!-- <TargetFramework>net461</TargetFramework> -->
+    <!-- <TargetFramework>net45</TargetFramework> -->
     <!-- <TargetFramework>netstandard2.0</TargetFramework> Not a runnable framework! -->
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
   <!-- <ItemGroup>
     <PackageReference Include="RDFSharp" Version="1.0.1" /> 
@@ -26,7 +26,8 @@
     <Compile Include="SubjectGraphAPI.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FSharp.Data" Version="3.0.0" />
+    <!-- <PackageReference Update="FSharp.Core" Version="4.3.4" /> --> <!-- update vs. include? -->
+    <PackageReference Include="FSharp.Data" Version="3.0.0" /> 
     <PackageReference Include="FsPickler" Version="5.2" />
     <PackageReference Include="Newtonsoft.JSON" Version="11.0.2" />
     <PackageReference Include="Suave" Version="2.5.2" />
