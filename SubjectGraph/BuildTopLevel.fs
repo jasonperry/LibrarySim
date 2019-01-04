@@ -14,9 +14,9 @@ open System.Collections.Generic
 open BookTypes
 let graphFileName = "output/TopLevelIndex.sgb"
 [<Literal>] 
-let DATADIR = @"/home/jperry/code/LibrarySim/SubjectGraph/indexdata/"
+let DATADIR = @"./indexdata/" // OK on Windows.
 [<Literal>]
-let CSVFILE = DATADIR + "TopLevelIndex.csv" //"../bookdata/TopLevelIndex.csv"
+let CSVFILE = DATADIR + "TopLevelIndex.csv"
 
 type LOCIndex = FSharp.Data.CsvProvider<CSVFILE, AssumeMissingValues=true>
 
