@@ -12,6 +12,9 @@ open System.Web // HttpUtility.HtmlEncode
 open BookTypes
 open SubjectGraph
 
+// TODO: put these in a configuration file.
+let listenIPs = ["127.0.0.1"; "192.168.0.11"]
+
 /// Immutable SubjectNode info returned by the API, to be directly JSONized 
 ///   and sent to the browser.
 /// ...should it contain a pointer to the books? or back to the node itself?
@@ -154,7 +157,12 @@ let main argv =
     | "serve" -> 
       let theGraph = loadGraph argv.[1]
       printfn "Loaded subject graph"
-      startWebServer defaultConfig (dispatch theGraph) //(Successful.OK "Hello, Suave!")
+      startWebServer 
+        { defaultConfig with 
+            bindings = List.map (fun ip -> HttpBinding.createSimple HTTP ip 8080) 
+                                listenIPs 
+        }
+        (dispatch theGraph) //(Successful.OK "Hello, Suave!")
       0
     | _ -> 
       printfn "Unknown argument: %s" argv.[0]

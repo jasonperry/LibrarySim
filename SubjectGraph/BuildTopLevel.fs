@@ -13,16 +13,16 @@ open SubjectGraph
 open System.Collections.Generic
 open BookTypes
 let graphFileName = "output/TopLevelIndex.sgb"
-[<Literal>] 
-let DATADIR = @"./indexdata/" // OK on Windows.
+// [<Literal>] 
+// let DATADIR = @"./indexdata/" // OK for type provider on Windows, but not for running!
 [<Literal>]
-let CSVFILE = DATADIR + "TopLevelIndex.csv"
+let CSVFILE = @"indexdata/TopLevelIndex.csv"
 
 type LOCIndex = FSharp.Data.CsvProvider<CSVFILE, AssumeMissingValues=true>
 
 // TODO: addSubjectNode (uri, name, altnames, parents) - computes booksUnder from narrower
 let buildGraph () = 
-    let index = LOCIndex.Load(CSVFILE)
+    let index = LOCIndex.Load(__SOURCE_DIRECTORY__ + "/" + CSVFILE)
     let theGraph = SubjectGraph.emptyGraph () 
     let mutable nodeCount = 0
 
