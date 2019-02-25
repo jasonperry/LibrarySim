@@ -49,7 +49,7 @@ let insertNode (graph: SubjectGraph) node =
             printfn "Subject %A already in index" node.name 
             exactMatch
         | None -> 
-            SubjectGraph.insertNode graph node 
+            SubjectGraph.insertNode SubjectNode.isNarrower graph node 
             node
             (* npIndex.Add node
             // assume each node added just once, so no add..TEST IT
@@ -89,6 +89,7 @@ let getAllSubfields (datafield : Marc21ClassRecord.Datafield) code =
     |> Array.filter (fun (sf : Marc21ClassRecord.Subfield) -> sf.Code = code) 
     |> Array.map (fun (sf : Marc21ClassRecord.Subfield) -> sf.Value)
 
+/// NOT USED. Earlier attempt to get XML by pieces?
 let rec nextRecord (reader : XmlReader) = 
     if reader.Read() then
         match reader.NodeType with
@@ -99,6 +100,7 @@ let rec nextRecord (reader : XmlReader) =
             | _ -> nextRecord reader
     else None
 
+/// Generator to parse individual MarcXML records from a stream.
 let readRecords (reader : XmlReader) = 
     seq {
         while (reader.Read()) do
@@ -216,8 +218,8 @@ let buildGraph gzfile =
     reader.MoveToContent() |> ignore // Can I avoid this or put it inside readRecords?
     try 
         let theGraph = processClassRecords (readRecords reader)
-        SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
-        printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
+        // SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
+        // printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
         reader.Close()
         instream.Close()
         // desperate attempt to reclaim memory before serialization.

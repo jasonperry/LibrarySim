@@ -91,7 +91,7 @@ let processRecords (data : Marc21Slim.Collection) =
                 with 
                     // If the call number is letters (gutenberg), detect and store.
                     | CallNumberError errorstr -> 
-                        if isCNLetters cn then 
+                        if LCCN.isCNLetters cn then 
                             lcLetters <- Some cn
                         else printfn "(!!) %s" errorstr
                 withCallNum <- withCallNum + 1

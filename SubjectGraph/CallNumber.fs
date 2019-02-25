@@ -26,21 +26,17 @@ let LCCN_PARTIAL_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                          + "(\.[A-Z][0-9]{0,5})"   //  g5: cutter1 (maybe no number)
                          + " ?([A-Z][0-9]{0,4})?)?" // g6: cutter2 (maybe no number)
 
-// If a string doesn't parse as LCCN, see if it looks like just the letters part (gutenberg)
-let isCNLetters s = 
-    let isAlpha c = 'A' <= c && c <= 'z'
-    String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
-
 let applyOption x someFn noThing = 
     match x with
-        | Some v -> someFn v
-        | None -> noThing
+    | Some v -> someFn v
+    | None -> noThing
 
 let (|?) = defaultArg
 
+/// The LCCN Record type. TODO: Call number interface for other types.
 type LCCN = {
     letters : string;
-    number : int option;
+    number : int option; // optional for partial CNs; should be in all complete CNs.
     decimal : Decimal option;
     cutter1 : (char * int option) option;
     cutter2 : (char * int option) option;
@@ -48,6 +44,25 @@ type LCCN = {
     misc : string option; // "v.1", "c.2", "suppl.", "Pt.1" 
 } 
 module LCCN = 
+    /// Chop off one field of the CN, for a more general match.
+    let shortenByOneField (cn : LCCN) = 
+        match cn.misc with
+        | Some _ -> {cn with misc = None}
+        | None -> match cn.date with 
+                  | Some _ -> {cn with date = None}
+                  | None -> match cn.cutter2 with 
+                            | Some _ -> {cn with cutter2 = None}
+                            | None -> match cn.cutter1 with
+                                      | Some _ -> {cn with cutter1 = None}
+                                      | None -> match cn.decimal with
+                                                | Some _ -> {cn with decimal = None}
+                                                | None -> match cn.number with
+                                                          | Some _ -> {cn with number = None}
+                                                          | None -> cn
+    /// If a string doesn't parse as LCCN, see if it looks like just the letters part (gutenberg)
+    let isCNLetters s = 
+        let isAlpha c = 'A' <= c && c <= 'z'
+        String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
     let show (cn : LCCN) = // might want to try monadic style with this too 
         cn.letters + string cn.number
         + applyOption cn.decimal string ""
@@ -119,7 +134,6 @@ module LCCN =
         cn1.letters <= cn2.letters 
         || cn1.number <= cn2.number *) 
 
-// TODO: Range *should* allow a 'letters-only' CN. Then how to compare? Make a "magic" numbers value?
 type LCCNRange = { 
     startCN : LCCN
     endCN : LCCN
@@ -158,10 +172,10 @@ module CNRange = // nice if it could be a functor over types of CNs...
         /// Return the first position in the left list at which the right list 
         /// matches the entire remainder. 
         let leftSuffixMatch (left: 'a list) (right: 'a list) = 
-            let mutable pos = 0
+            let mutable startPos = 0
             let mutable found = false
-            while pos < left.Length && not found do 
-                let mutable lpos = pos
+            while startPos < left.Length && not found do 
+                let mutable lpos = startPos
                 let mutable rpos = 0
                 while lpos < left.Length && rpos < right.Length && left.[lpos] = right.[rpos] do
                     lpos <- lpos + 1
@@ -170,8 +184,8 @@ module CNRange = // nice if it could be a functor over types of CNs...
                 if lpos = left.Length then
                     found <- true
                 else
-                    pos <- pos + 1
-            if found then pos else -1
+                    startPos <- startPos + 1
+            if found then startPos else -1
         let sameClass (c1: char) (c2: char) = 
             Char.IsDigit c1 && Char.IsDigit c2 ||
             Char.IsLetter c1 && Char.IsLetter c2 ||
@@ -203,20 +217,25 @@ module CNRange = // nice if it could be a functor over types of CNs...
     let parse (s : string) = 
         let cnStrings = s.Split [|'-'|]
         if Array.length cnStrings = 2 then
-            {startCN = LCCN.parse cnStrings.[0]; 
+            let startCNParsed  = LCCN.parse cnStrings.[0];
+            {startCN = startCNParsed
              endCN = 
-                try
-                    LCCN.parse cnStrings.[1]
-                with CallNumberError _ -> 
-                    // we just let this throw if it fails.
+                if String.IsNullOrEmpty(cnStrings.[1]) then 
+                    // TODO: will I ever be able to do the extension?
+                    startCNParsed 
+                else 
                     try
-                        let patched = patchCNSuffix cnStrings.[0] cnStrings.[1]
-                        printfn "Successfully patched %s with suffix %s: %s" 
-                                cnStrings.[0] cnStrings.[1] patched // DEBUG
-                        LCCN.parse patched
-                    with CallNumberError msg ->
-                        printfn "Failed patch or parse: %s" msg
-                        LCCN.parse cnStrings.[0] // MAY CHANGE - just to get a result
+                        LCCN.parse cnStrings.[1]
+                    with CallNumberError _ -> 
+                        // we just let this throw if it fails.
+                        try
+                            let patched = patchCNSuffix cnStrings.[0] cnStrings.[1]
+                            printfn "Successfully patched %s with suffix %s: %s" 
+                                    cnStrings.[0] cnStrings.[1] patched // DEBUG
+                            LCCN.parse patched
+                        with CallNumberError msg ->
+                            printfn "Failed patch or parse: %s" msg
+                            startCNParsed // MAY CHANGE - just to get a result
             }
         elif Array.length cnStrings = 1 then
             {startCN = LCCN.parse cnStrings.[0]; 
@@ -230,3 +249,35 @@ module CNRange = // nice if it could be a functor over types of CNs...
     let isSubRange subrange range = 
         contains range subrange.startCN && contains range subrange.endCN
 
+/// Tree for parent/child relationships of CN Ranges.
+/// Lookup of existing nodes can be done in SubjectGraph.CNIndex
+/// TODO: Needs parent?
+/// Should be obsoleted by improved node insertion code.
+(* 
+type CNRangeTree = { range: LCCNRange; children: CNRangeTree list }
+with 
+    /// Insert returns the node above where it was inserted, or the node itself
+    /// it it's a new root.
+    member this.insert cnRange = 
+        // special case: insert above top node. Hope it won't happen?
+        if CNRange.isSubRange this.range cnRange
+        then // new root.
+            { range = cnRange; children = [this] }
+        else 
+            match List.tryFind (fun nd -> CNRange.isSubRange cnRange nd.range) this.children with
+            // wait. It could either be a sibling or parent of all or some of the children!!
+            // What if it's a parent of some? Should replace just those and be a sibling of the rest.
+            // Wait again. This code should be where a node is inserted in the graph. 
+            //   ** Is what we need just a variable isChild function to pass in?? **
+            | None -> 
+                let myChildren = List.filter 
+                { range = this.range; 
+                        children = ({range=cnRange; children=[]})::this.children }
+            | Some subtree -> subtree.insert cnRange
+    member this.findParent cnRange = 
+        if CNRange.isSubRange this.range cnRange
+        then    
+            { range = cnRange; children = [this] }
+        else
+*)
+            

@@ -19,7 +19,7 @@ type SubjectNode = {
     uri : Uri;
     name : string; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
     subdividedName : string list;
-    callNumRange : LCCNRange option; // string option;
+    callNumRange : LCCNRange option;
     cnString : string option; // just as a backup
     // no explicit refs needed for these, F# uses reference semantics 
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
@@ -31,9 +31,11 @@ type SubjectNode = {
 
 /// Utility functions for individual SubjectNodes.
 module SubjectNode =
+    // TODO: These are now specific to subdividedNames, so go elsewhere?
     let isNarrower node1 node2 = 
         isStrictPrefix node2.subdividedName node1.subdividedName
         // TODO: Will I need to add CN-based later, or will this always suffice?
+        // More fundamental question: are parents in the graph always broader?
     let isBroader node1 node2 = 
         isStrictPrefix node1.subdividedName node2.subdividedName
     let joinSubjectName slist = List.reduce (fun l r -> l + "--" + r) slist
@@ -137,29 +139,58 @@ type NamePrefixIndex = private {
     /// a solution as a new type or custom serialization.)
     member this.Clear () = this.theMap.Clear()
 
+/// Search algorithm for CN Index. Hopefully obsolete, all tree-based now.
+(* module CNIndex = 
+    let rec mostSpecificMatch (cnIndex: Dictionary<LCCNRange, SubjectNode list>) (cn: LCCNRange) = 
+        if cnIndex.ContainsKey cn 
+        then Some cnIndex.[cn]
+        else 
+            let shortenedcn = LCCN.shortenByOneField cn
+            if shortenedcn = cn then None
+            else mostSpecificMatch cnIndex shortenedcn *)
+
 /// SubjectGraph record type.
 type SubjectGraph = {
         // I tried making it a class but then couldn't modify the mutable fields.
-        topLevel : List<SubjectNode>; 
+        // topLevel : List<SubjectNode>; 
+        topNode : SubjectNode;
         // went back to immutable lists. Even broaders won't actually be added twice.
-        cnIndex : Dictionary<string, SubjectNode list>;  // maybe not unique 
+        cnIndex : Dictionary<LCCNRange, SubjectNode list>;  // maybe not unique 
         subjectNameIndex : Dictionary<string, SubjectNode list>;
-        subjectPrefixIndex : NamePrefixIndex;
+        subjectPrefixIndex : NamePrefixIndex; // hopefully obsolete.
         // should be unique...hashset? Can we make out of BasicURI...yes.
         uriIndex : Dictionary<Uri, SubjectNode>; 
     } 
 
 /// Functions relevant to the SubjectGraph data structure.
 module SubjectGraph = 
-    let emptyGraph () =  { 
-        // TODO: change to have a top node instead of a top level.
-        topLevel = new List<_> (); // Later: read from pre-generated list.
-        cnIndex = new Dictionary<_,_> ();
-        subjectNameIndex = new Dictionary<_,_> ();
-        subjectPrefixIndex = NamePrefixIndex.Create ();
-        uriIndex = new Dictionary<_,_> ()
-    }
+    let emptyGraph () =  
+        // TODO: parameterize by catalog type. LOC only for now.
+        let topNode = {
+            uri = Uri "http://knowledgeincoding.net/subject/00top";
+            name = "Top Subject"; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
+            subdividedName = ["Top Subject"];
+            callNumRange = Some {startCN = LCCN.parse "A"; endCN = LCCN.parse "ZZ"};
+            cnString = Some "A-ZZ"; // just as a backup
+            broader = new List<SubjectNode>(); // formerly SubjectNode list
+            narrower = new List<SubjectNode>(); 
+            books = new List<BookRecord>();
+            booksUnder = 0  // to keep a count
+        }
+        let uriIndex = new Dictionary<_,_>()
+        uriIndex.Add(topNode.uri, topNode)
+        let cnIndex = new Dictionary<_,_> ();
+        cnIndex.Add(topNode.callNumRange.Value, [topNode])
+        // Don't bother adding top to name indexes.
+        { 
+            topNode = topNode;
+            cnIndex = cnIndex;
+            subjectNameIndex = new Dictionary<_,_> ();
+            subjectPrefixIndex = NamePrefixIndex.Create ();
+            uriIndex = uriIndex
+        }
     /// Probably more efficient than maintaining the prefixIndex, but not sufficient.
+    /// TODO: move this into a "SubjectSegmentIndex" module, like with CNIndex.
     let findLongestPrefixSubj graph (splitSubj : string list) = 
         let rec findit slist = 
             match slist with 
@@ -170,9 +201,45 @@ module SubjectGraph =
                         graph.subjectNameIndex.[label]
                     else findit slist.[..List.length slist - 2]
         findit splitSubj
-    /// Take a completed subject entry and update the graph structure.
-    /// TODO: different ones: insertNodeByCN, insertNodeBySubdividedSubject
-    let insertNode graph (newNode: SubjectNode) = 
+    /// Totally awesome, perfect, clear, generic node insertion function.
+    /// Dependency injection! an isChild comparison function: CNRange.isSubRange
+    /// Will not create a new top node.
+    let insertNode (isNarrower : SubjectNode -> SubjectNode -> bool) graph (newNode : SubjectNode) =
+        // Find the location of the new node in existing graph, returning parents and children.
+        let rec insert atnode = 
+            // check if it goes between atnode and atnode.narrower.
+            let childCandidates = Seq.filter (fun nd -> isNarrower nd newNode) atnode.narrower
+            if not (Seq.isEmpty childCandidates)
+            then
+                newNode.narrower.AddRange childCandidates
+                newNode.broader.Add atnode
+                Seq.iter (fun child -> atnode.narrower.Remove child |> ignore;
+                                       child.broader.Remove atnode |> ignore; 
+                                       child.broader.Add newNode |> ignore) childCandidates
+                // ([atnode], childCandidates) // Note: still need to remove from parent's children
+            else 
+                // Try to find the node it goes below
+                match Seq.tryFind (fun nd -> isNarrower newNode nd) atnode.narrower with
+                | Some foundParent -> insert foundParent
+                // Node doesn't go below any; it must be a sibling of atnode.narrower.
+                | None -> 
+                    newNode.broader.Add atnode
+                    // nothing added to newNode's children.
+                    atnode.narrower.Add newNode
+        insert graph.topNode
+        // Add to the indexes. 
+        graph.subjectPrefixIndex.Add newNode // Will this work if it's empty?
+        graph.uriIndex.Add(newNode.uri, newNode)
+        // If subject has a call number, add that to the index.
+        match newNode.callNumRange with 
+            | Some cn -> 
+                if graph.cnIndex.ContainsKey cn then
+                    graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
+                else graph.cnIndex.Add (cn, [newNode])
+            | None -> ()
+
+    /// Take a completed subject entry and update the graph structure, based on name segments
+    let insertNodeBySubjectSegments graph (newNode: SubjectNode) = 
         // TODO? Check if already in index, since this function is doing the work now?
         // Remove links that this node will go between.
         // *debug*
@@ -246,17 +313,16 @@ module SubjectGraph =
         // Temp change 12/24: pulling out just letters from parsed CNRange.
         match newNode.callNumRange with 
             | Some cn -> 
-                let letters = cn.startCN.letters
-                if graph.cnIndex.ContainsKey letters then
-                    graph.cnIndex.[letters] <- newNode :: graph.cnIndex.[letters]
-                else graph.cnIndex.Add (letters, [newNode])
+                if graph.cnIndex.ContainsKey cn then
+                    graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
+                else graph.cnIndex.Add (cn, [newNode])
             | None -> ()
     /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
-    let makeTopLevel graph = 
+    (* let makeTopLevel graph = 
         for node in graph.uriIndex.Values do
             if node.broader.Count = 0 then
-                graph.topLevel.Add(node)
+                graph.topLevel.Add(node) *)
 
 /// Return true if list1 is a strict prefix of list2 (not equal).
 
@@ -391,7 +457,7 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
             books = new List<BookRecord>();
             booksUnder = 0
         }
-        SubjectGraph.insertNode graph newNode // find its place, fill in broader & narrower.
+        SubjectGraph.insertNode SubjectNode.isNarrower graph newNode // find its place, fill in broader & narrower.
         Some newNode
         //if parents.IsEmpty then None else Some newNode
     
@@ -431,13 +497,14 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
 /// To make generic: pass in a "getCommand", "outputSubjectList" and "outputBookList" funs. 
 let browseGraph (graph : SubjectGraph) = 
     // Remember our path back to the root. 
-    let hist = new Stack<List<SubjectNode>> ()
+    let hist = new Stack<SubjectNode> ()
     (* Might like to print out some level info. *)
     (* Should also be getting the book count underneath and skipping if there's just one 
        (to avoid long single chains) *)
     printfn "*** Top Level Subjects ***" // Shouldn't be here... 
     // letrec is preferable to a while loop and mutable variable? 
-    let rec loop (currentList : List<SubjectNode>) = 
+    let rec loop (currentNode : SubjectNode) = 
+        let currentList = currentNode.narrower
         // When I go up, construct mutable list.. why not make an immutable list?
         List.iteri (fun i node -> 
                         let entryString = 
@@ -457,7 +524,7 @@ let browseGraph (graph : SubjectGraph) =
         match input with
             | NumOpt i -> 
                 if 0 <= i && i < currentList.Count then
-                    hist.Push currentList
+                    hist.Push currentNode
                     // If the selected node has books, print them. Later, add options to this.
                     if not (Seq.isEmpty (currentList.[i].books)) then
                         printfn "\n**** Books for subject \"%s\" ****" currentList.[i].name
@@ -470,28 +537,28 @@ let browseGraph (graph : SubjectGraph) =
                     // Print the title before recursing.
                     if not (currentList.[i].narrower.Count = 0) then
                         printfn "*** Subheadings of %s ***" currentList.[i].name
-                    loop currentList.[i].narrower
+                    loop currentList.[i]
                 else 
                     printfn "Index out of range"
-                    loop currentList
+                    loop currentNode
             | CharOpt c ->
                 match c with 
                     | 'q' -> ()
                     | 'u' -> 
                         if hist.Count = 0 then
                             printfn "Already at top level!"
-                            loop currentList
+                            loop currentNode
                         else
                             loop <| hist.Pop ()
-                    | 't' -> loop graph.topLevel
+                    | 't' -> loop graph.topNode
                     | _ -> 
                         printfn "Unrecognized option"
-                        loop currentList
+                        loop currentNode
             | Fail -> 
                 printfn "Unrecognized input"
-                loop currentList
+                loop currentNode
         (* active pattern to match and interpret? *)
-    loop graph.topLevel
+    loop graph.topNode
         
 // Maybe I won't need to use the RDF library at all. 
 (*

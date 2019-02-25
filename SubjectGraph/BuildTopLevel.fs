@@ -12,6 +12,8 @@ open System.Runtime.Serialization.Formatters.Binary
 open SubjectGraph
 open System.Collections.Generic
 open BookTypes
+open CallNumber
+
 let graphFileName = "output/TopLevelIndex.sgb"
 // [<Literal>] 
 // let DATADIR = @"./indexdata/" // OK for type provider on Windows, but not for running!
@@ -24,10 +26,11 @@ type LOCIndex = FSharp.Data.CsvProvider<CSVFILE, AssumeMissingValues=true>
 let buildGraph () = 
     let index = LOCIndex.Load(__SOURCE_DIRECTORY__ + "/" + CSVFILE)
     let theGraph = SubjectGraph.emptyGraph () 
-    let mutable nodeCount = 0
+    let mutable nodeCount = 1 // for top node.
 
     for row in index.Rows do
         let parents = List.filter ((<>) "") [row.Parent1; row.Parent2; row.Parent3]
+        // TODO: Add alt name handling to main SubjectGraph code.
         let altnames = List.filter ((<>) "") [row.Altlabel1; row.Altlabel2; row.Altlabel3]
         let subjName = row.``Auth Label``
         let node = {
@@ -36,7 +39,13 @@ let buildGraph () =
             subdividedName = SubjectNode.splitSubjectName subjName
             cnString = if row.``Call Num`` = "" then None
                            else Some row.``Call Num``
-            callNumRange = None
+            callNumRange = if row.``Call Num`` = "" then None
+                           else Some <| 
+                                try 
+                                    CNRange.parse (row.``Call Num``)
+                                with CallNumberError msg -> 
+                                    failwith msg
+                                    
             // should throw if parents don't exist (haven't been added)
             broader = new List<_> (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
             narrower = new List<SubjectNode>()
@@ -45,8 +54,12 @@ let buildGraph () =
         }
         nodeCount <- nodeCount + 1
         printf "%d.." nodeCount
+        // insert by call number
+        let isNarrower n1 n2 = CNRange.isSubRange n1.callNumRange.Value n2.callNumRange.Value
+        SubjectGraph.insertNode isNarrower theGraph node
         // should really only have one for the top-level index. Test this.
-        theGraph.uriIndex.Add(node.uri, node)
+        //theGraph.uriIndex.Add(node.uri, node)
+        // Still do this manually for now?
         for label in node.name :: altnames do
             if theGraph.subjectNameIndex.ContainsKey(label) then
                 printfn "Warning: subject name '%s' already exists" label
@@ -54,7 +67,7 @@ let buildGraph () =
                     node :: theGraph.subjectNameIndex.[label] 
             else
                 theGraph.subjectNameIndex.Add(label, [node])
-        if node.cnString.IsSome then
+        (*if node.cnString.IsSome then
             let cn = node.cnString.Value
             if theGraph.cnIndex.ContainsKey(cn) then
                 printfn "Warning: call number '%s' already exists" cn
@@ -65,10 +78,10 @@ let buildGraph () =
             theGraph.topLevel.Add(node)
         else
             for p in node.broader do
-                p.narrower.Add(node)
+                p.narrower.Add(node) *)
 
     printfn "\nProcessed %d subject entries" nodeCount
-    printfn "Added %d top level entries" theGraph.topLevel.Count
+    // printfn "Added %d top level entries" theGraph.topLevel.Count
     printfn "Added %d different names" theGraph.subjectNameIndex.Count
     printfn "Added %d call letters/ranges" theGraph.cnIndex.Count
 

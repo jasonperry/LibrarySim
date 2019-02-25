@@ -13,7 +13,7 @@ open BookTypes
 open SubjectGraph
 
 // TODO: put these in a configuration file.
-let listenIPs = ["127.0.0.1"; "192.168.0.11"]
+let listenIPs = ["127.0.0.1"; "192.168.0.13"]
 
 /// Immutable SubjectNode info returned by the API, to be directly JSONized 
 ///   and sent to the browser.
@@ -45,7 +45,7 @@ module SubjectsResult =
       + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) + "</a>"
     
     (if List.isEmpty sr.broader then 
-         "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=top\">Top level</a></p>" 
+         "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/subject/00top\">Top level</a></p>" 
      else
          "Up: " + (String.concat " " (List.map makeSubjectInfoLink sr.broader)))
     + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
@@ -53,8 +53,8 @@ module SubjectsResult =
     + "Entries under this heading: " + (string sr.booksUnder) + "</p>"
     + String.concat "<br />" (List.map makeSubjectInfoLink sr.narrower)
 
-  /// Construct a result object corresponding to the top level.
-  let topLevel (g : SubjectGraph) = 
+  /// Construct a result object corresponding to the top level. No longer needed?
+  (* let topLevel (g : SubjectGraph) = 
     let topSubjects = List.ofSeq (g.topLevel)
     {
       thisSubject = {uri = None; name = "Top Level"};
@@ -63,16 +63,17 @@ module SubjectsResult =
         |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
       booksUnder = List.sumBy (fun (nd : SubjectNode) -> nd.booksUnder) topSubjects
       cnRange = "A-Z"
-    }
+    } *)
 
 // TODO: monadize the error handling.  -> WebResult string
 // The ^^ is the "request combinator"
 let getSubjectResult g q = 
   defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
   |> fun uriStr -> 
-    if uriStr = "top" then 
+    (*if uriStr = "top" then 
       SubjectsResult.topLevel g
-    else 
+    else *)
+      // TODO: error handling
       SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
 
 /// Transmission type of all books under a SubjectNode.
@@ -92,8 +93,8 @@ module BooksResult =
         "<b>" + HttpUtility.HtmlEncode(br.Title) + "</b><br />"
         + HttpUtility.HtmlEncode(br.Authors) + "<br />"
         + match br.Link with 
-            | Some link -> "<a href=\"" + link + "\">" + link + "</a>"
-            | None -> "(no link)"
+          | Some link -> "<a href=\"" + link + "\">" + link + "</a>"
+          | None -> "(no link)"
     "<div class=\"booklisting\">"
     + (String.concat "" (List.map (fun br -> "<p>" + bookfmt br + "</p>") bres.books))
     + "</div>"
@@ -136,25 +137,25 @@ let dispatch g =
 [<EntryPoint>]
 let main argv =
   match argv.[0] with 
-    | "buildLCClassGraph" -> 
+  | "buildLCClassGraph" -> 
       BuildLCClassGraph.buildGraph argv.[1]
       0
-    | "buildTopLevel" -> 
+  | "buildTopLevel" -> 
       BuildTopLevel.buildGraph ()
       0
-    | "buildGutenBooks" ->
+  | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]
       0
-    | "buildGutenGraph" ->
+  | "buildGutenGraph" ->
       // any way to detect if records.brb is up to date? Not bothering yet!
       BuildFromBooks.buildGraph argv.[1]
       0
-    | "browse" ->
+  | "browse" ->
       printfn "Loading graph %s" argv.[1]
       let graph = loadGraph argv.[1]
       browseGraph graph
       0
-    | "serve" -> 
+  | "serve" -> 
       let theGraph = loadGraph argv.[1]
       printfn "Loaded subject graph"
       startWebServer 
@@ -164,7 +165,7 @@ let main argv =
         }
         (dispatch theGraph) //(Successful.OK "Hello, Suave!")
       0
-    | _ -> 
+  | _ -> 
       printfn "Unknown argument: %s" argv.[0]
       1
       

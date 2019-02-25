@@ -1,33 +1,22 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<!-- Could I ad multiple project entries? -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- If we omit this, it's a dll and has no EntryPoint. -->
-    <OutputType>Exe</OutputType> 
-    <!-- This determines which versions of the packages it will pull. -->
-    <!-- <TargetFramework>net45</TargetFramework> -->
-    <!-- <TargetFramework>netstandard2.0</TargetFramework> Not a runnable framework! -->
+    <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
-  <!-- <ItemGroup>
-    <PackageReference Include="RDFSharp" Version="1.0.1" /> 
-  </ItemGroup>
-  <Import Project="..\.paket\Paket.Restore.targets" />  -->
   <ItemGroup>
     <Compile Include="Logger.fs" />
     <Compile Include="CallNumber.fs" />
     <Compile Include="BookTypes.fs" />
     <Compile Include="SparqlQuery.fs" />
-    <Compile Include="SubjectGraph.fs" /> 
+    <Compile Include="SubjectGraph.fs" />
     <Compile Include="BuildTopLevel.fs" />
-    <Compile Include="BuildLCClassGraph.fs" /> 
+    <Compile Include="BuildLCClassGraph.fs" />
     <Compile Include="BuildFromBooks.fs" />
     <Compile Include="MarcXmlToBooks.fs" />
     <Compile Include="SubjectGraphAPI.fs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- <PackageReference Update="FSharp.Core" Version="4.3.4" /> --> <!-- update vs. include? -->
-    <PackageReference Include="FSharp.Data" Version="3.0.0" /> 
+    <PackageReference Include="FSharp.Data" Version="3.0.0" />
     <PackageReference Include="FsPickler" Version="5.2" />
     <PackageReference Include="Newtonsoft.JSON" Version="11.0.2" />
     <PackageReference Include="Suave" Version="2.5.2" />
