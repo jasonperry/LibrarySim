@@ -229,3 +229,4 @@ FableTest/
 SubjectGraph/indexdata/TopLevelIndex.csv
 SubjectGraph/logs
 SubjectGraph/indexdata/arizonaLC.xml.gz
+.DS_Store
