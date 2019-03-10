@@ -167,7 +167,7 @@ module SubjectGraph =
     let emptyGraph () =  
         // TODO: parameterize by catalog type. LOC only for now.
         let topNode = {
-            uri = Uri "http://knowledgeincoding.net/subject/00top";
+            uri = Uri "http://knowledgeincoding.net/classif/00top";
             name = "Top Subject"; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
             subdividedName = ["Top Subject"];
             callNumRange = Some {startCN = LCCN.parse "A"; endCN = LCCN.parse "ZZ"};
@@ -206,6 +206,7 @@ module SubjectGraph =
     /// Will not create a new top node.
     let insertNode (isNarrower : SubjectNode -> SubjectNode -> bool) graph (newNode : SubjectNode) =
         // Find the location of the new node in existing graph, returning parents and children.
+        // Assumes node isn't already in the graph.
         let rec insert atnode = 
             // check if it goes between atnode and atnode.narrower.
             let childCandidates = Seq.filter (fun nd -> isNarrower nd newNode) atnode.narrower
@@ -213,9 +214,10 @@ module SubjectGraph =
             then
                 newNode.narrower.AddRange childCandidates
                 newNode.broader.Add atnode
-                Seq.iter (fun child -> atnode.narrower.Remove child |> ignore;
-                                       child.broader.Remove atnode |> ignore; 
-                                       child.broader.Add newNode |> ignore) childCandidates
+                // Oops, I have to build a list and remove later from "atnode"
+                // Seq.iter (fun child -> atnode.narrower.Remove child |> ignore) childCandidates
+                Seq.iter (fun child -> child.broader.Remove atnode |> ignore) childCandidates
+                Seq.iter (fun child -> child.broader.Add newNode |> ignore) childCandidates
                 // ([atnode], childCandidates) // Note: still need to remove from parent's children
             else 
                 // Try to find the node it goes below
