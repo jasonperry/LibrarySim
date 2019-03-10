@@ -46,8 +46,8 @@ let buildGraph () =
                                 with CallNumberError msg -> 
                                     failwith msg
                                     
-            // should throw if parents don't exist (haven't been added)
-            broader = new List<_> (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
+            // Don't need to add parents manually, done by call number!
+            broader = new List<_>() // (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
             narrower = new List<SubjectNode>()
             books = new List<BookRecord>()
             booksUnder = 0
@@ -84,7 +84,8 @@ let buildGraph () =
     // printfn "Added %d top level entries" theGraph.topLevel.Count
     printfn "Added %d different names" theGraph.subjectNameIndex.Count
     printfn "Added %d call letters/ranges" theGraph.cnIndex.Count
-
-    saveGraph theGraph graphFileName
-
+    theGraph
+    
+let writeTopLevelGraph () = 
+    saveGraph (buildGraph ()) graphFileName
     printfn "Graph saved to %s" graphFileName

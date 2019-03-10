@@ -45,7 +45,7 @@ module SubjectsResult =
       + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) + "</a>"
     
     (if List.isEmpty sr.broader then 
-         "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/subject/00top\">Top level</a></p>" 
+         "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/classif/00top\">Top level</a></p>" 
      else
          "Up: " + (String.concat " " (List.map makeSubjectInfoLink sr.broader)))
     + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
@@ -141,7 +141,7 @@ let main argv =
       BuildLCClassGraph.buildGraph argv.[1]
       0
   | "buildTopLevel" -> 
-      BuildTopLevel.buildGraph ()
+      BuildTopLevel.writeTopLevelGraph ()
       0
   | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]

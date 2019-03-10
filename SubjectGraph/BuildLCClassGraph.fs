@@ -22,6 +22,7 @@ open FSharp.Data
 open BookTypes
 open CallNumber
 open SubjectGraph
+open BuildTopLevel
 
 let outputGraphFileName = "output/ClassGraph.sgb"
 
@@ -49,7 +50,12 @@ let insertNode (graph: SubjectGraph) node =
             printfn "Subject %A already in index" node.name 
             exactMatch
         | None -> 
-            SubjectGraph.insertNode SubjectNode.isNarrower graph node 
+            match node.callNumRange with
+            | Some cn -> 
+                let isNarrower = fun n1 n2 -> CNRange.isSubRange n1.callNumRange.Value n2.callNumRange.Value
+                SubjectGraph.insertNode isNarrower graph node 
+            | None -> 
+                printfn "No call number for %s, not inserting (for now)" node.name
             node
             (* npIndex.Add node
             // assume each node added just once, so no add..TEST IT
@@ -110,8 +116,8 @@ let readRecords (reader : XmlReader) =
     }
 
 /// Create SubjectNode objects and send them to insertNode.
-let processClassRecords (records : Marc21ClassRecord.Record seq) = 
-    let theGraph = SubjectGraph.emptyGraph()
+let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) = 
+    // let theGraph = SubjectGraph.emptyGraph()
     let mutable recordCount = 0
     let mutable withNoCallNum = 0
     let mutable callNumCount = 0
@@ -217,7 +223,8 @@ let buildGraph gzfile =
     let reader = XmlReader.Create(instream)
     reader.MoveToContent() |> ignore // Can I avoid this or put it inside readRecords?
     try 
-        let theGraph = processClassRecords (readRecords reader)
+        let startGraph = BuildTopLevel.buildGraph () // OR SubjectGraph.emptyGraph()
+        let theGraph = addClassRecords startGraph (readRecords reader)
         // SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
         // printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
         reader.Close()
@@ -229,4 +236,3 @@ let buildGraph gzfile =
         printfn "Class graph saved to %s" outputGraphFileName
     with 
         | CallNumberError msg -> printfn "CallNumberError: %s" msg
-    // Need to post-process graph, finding toplevel.
