@@ -204,23 +204,24 @@ module SubjectGraph =
     /// Totally awesome, perfect, clear, generic node insertion function.
     /// Dependency injection! an isChild comparison function: CNRange.isSubRange
     /// Will not create a new top node.
-    let insertNode (isNarrower : SubjectNode -> SubjectNode -> bool) graph (newNode : SubjectNode) =
+    let insertNode (isNarrower : SubjectNode -> SubjectNode -> bool) graph newNode =
         // Find the location of the new node in existing graph, returning parents and children.
         // Assumes node isn't already in the graph.
         let rec insert atnode = 
-            // check if it goes between atnode and atnode.narrower.
+            // check if it goes between atnode and any of its children.
             let childCandidates = Seq.filter (fun nd -> isNarrower nd newNode) atnode.narrower
             if not (Seq.isEmpty childCandidates)
-            then
+            then // should I pick the broadest?
                 newNode.narrower.AddRange childCandidates
                 newNode.broader.Add atnode
                 // Oops, I have to build a list and remove later from "atnode"
                 // Seq.iter (fun child -> atnode.narrower.Remove child |> ignore) childCandidates
                 Seq.iter (fun child -> child.broader.Remove atnode |> ignore) childCandidates
                 Seq.iter (fun child -> child.broader.Add newNode |> ignore) childCandidates
-                // ([atnode], childCandidates) // Note: still need to remove from parent's children
+                (atnode, List.ofSeq childCandidates)
             else 
-                // Try to find the node it goes below
+                // Try to find nodes it goes below and recurse
+                // ...what if multiple could be parents? Let it happen and see!
                 match Seq.tryFind (fun nd -> isNarrower newNode nd) atnode.narrower with
                 | Some foundParent -> insert foundParent
                 // Node doesn't go below any; it must be a sibling of atnode.narrower.
@@ -228,7 +229,10 @@ module SubjectGraph =
                     newNode.broader.Add atnode
                     // nothing added to newNode's children.
                     atnode.narrower.Add newNode
-        insert graph.topNode
+                    (atnode, [])
+        let (parent, oldchildren) = insert graph.topNode
+        // Remove children from grandparent node (couldn't modify atnode in the let rec)
+        List.iter (fun child -> parent.narrower.Remove child |> ignore) oldchildren
         // Add to the indexes. 
         graph.subjectPrefixIndex.Add newNode // Will this work if it's empty?
         graph.uriIndex.Add(newNode.uri, newNode)
@@ -240,7 +244,7 @@ module SubjectGraph =
                 else graph.cnIndex.Add (cn, [newNode])
             | None -> ()
 
-    /// Take a completed subject entry and update the graph structure, based on name segments
+    /// OBSOLETE. Take a completed subject entry and update the graph structure, based on name segments
     let insertNodeBySubjectSegments graph (newNode: SubjectNode) = 
         // TODO? Check if already in index, since this function is doing the work now?
         // Remove links that this node will go between.
