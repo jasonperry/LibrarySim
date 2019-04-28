@@ -12,19 +12,19 @@ exception CallNumberError of string
 // To fix: 1st cutter can be something besides letter + digits 
 // groups: 1: letters, 2: number, 3: decimal 4: rest1, 5: cutter1, 6: cutter2, 7: space+year 
 let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
-                 + " ?([0-9]{1,5})"         // g2: number
+                 + " ?([0-9]{1,5})"         // g2: number // Removed optional space. Not in Class dataset.
                  + "(\.[0-9]{1,4})? ?"      // g3: decimal
                  + "((\.[A-Z][0-9]{1,5})"   // g4: rest, g5: cutter1
-                 + " ?([A-Z][0-9]{1,4})?)?" // g6: cutter2
-                 + "( [0-9]{4}[a-z]?)?"     // g7: year
-                 + "( [Vv]\.[0-9]+| [Cc]\.[0-9]+| [Pp]t\.[0-9]+| suppl.)?$" // g8: misc
+                 + "([\. ][A-Z]([0-9]{1,4})?)?)?" // g6: cutter2, g7: cutter2 number // formerly one
+                 + "( [0-9]{4}[a-z]?)?"     // g8: date
+                 + "( [Vv]\. ?[0-9]+| [Cc]\. ?[0-9]+| [Pp]t\. ?[0-9]+| suppl.)?$" // g9: misc
 
 /// Regex for prefixes of legal call numbers, used in the Class dataset
 let LCCN_PARTIAL_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                          + "( ?([0-9]{1,5})"        // g2: rest, g3: number
                          + "(\.[0-9]{1,4})? ?"      // g4: decimal
                          + "(\.[A-Z][0-9]{0,5})"   //  g5: cutter1 (maybe no number)
-                         + " ?([A-Z][0-9]{0,4})?)?" // g6: cutter2 (maybe no number)
+                         + "([\. ][A-Z][0-9]{0,4})?)?" // g6: cutter2 (maybe no number)
 
 let applyOption x someFn noThing = 
     match x with
@@ -38,7 +38,7 @@ type LCCN = {
     letters : string;
     number : int option; // optional for partial CNs; should be in all complete CNs.
     decimal : Decimal option;
-    cutter1 : (char * int option) option;
+    cutter1 : (char * Decimal option) option; 
     cutter2 : (char * int option) option;
     date : string option; // because of "2000b", etc. Lexicographic sorting should work? 
     misc : string option; // "v.1", "c.2", "suppl.", "Pt.1" 
@@ -48,21 +48,28 @@ module LCCN =
     let shortenByOneField (cn : LCCN) = 
         match cn.misc with
         | Some _ -> {cn with misc = None}
-        | None -> match cn.date with 
-                  | Some _ -> {cn with date = None}
-                  | None -> match cn.cutter2 with 
-                            | Some _ -> {cn with cutter2 = None}
-                            | None -> match cn.cutter1 with
-                                      | Some _ -> {cn with cutter1 = None}
-                                      | None -> match cn.decimal with
-                                                | Some _ -> {cn with decimal = None}
-                                                | None -> match cn.number with
-                                                          | Some _ -> {cn with number = None}
-                                                          | None -> cn
+        | None -> 
+          match cn.date with 
+          | Some _ -> {cn with date = None}
+          | None -> 
+            match cn.cutter2 with 
+            | Some _ -> {cn with cutter2 = None}
+            | None -> 
+              match cn.cutter1 with
+              | Some _ -> {cn with cutter1 = None}
+              | None -> 
+                match cn.decimal with
+                | Some _ -> {cn with decimal = None}
+                | None -> 
+                  match cn.number with
+                  | Some _ -> {cn with number = None}
+                  | None -> cn
     /// If a string doesn't parse as LCCN, see if it looks like just the letters part (gutenberg)
     let isCNLetters s = 
         let isAlpha c = 'A' <= c && c <= 'z'
         String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
+    let isLettersOnly (cn : LCCN) = 
+        cn.number = None
     let show (cn : LCCN) = // might want to try monadic style with this too 
         cn.letters + string cn.number
         + applyOption cn.decimal string ""
@@ -70,7 +77,7 @@ module LCCN =
         + applyOption cn.cutter2 (fun x -> " " + string (fst x) + string (snd x)) ""
         + applyOption cn.date string ""
     let parse (cnString : string) = 
-        let m = Regex.Match(cnString.ToUpper(), LCCN_REGEX)
+        let m = Regex.Match(cnString, LCCN_REGEX)  // Removed ToUpper; fixes should be before.
         if m.Success then 
             let groups = [ for g in m.Groups -> g.Value ]
             // printfn "%s" (groups.ToString ()) (* DEBUG *)
@@ -81,16 +88,18 @@ module LCCN =
                           else Some (decimal (groups.[3]));
                 cutter1 = if groups.[5] = "" then None 
                           // Skip initial dot 
-                          else Some (groups.[5].[1], Some (int (groups.[5].[2..])));
+                          else Some (groups.[5].[1], Some (Decimal.Parse ("." + (groups.[5].[2..]))));
                 cutter2 = if groups.[6] = "" then None 
-                          else Some (groups.[6].[0], Some (int (groups.[6].[1..])));
-                date = if groups.[7] = "" then None 
-                       else Some (groups.[7].[1..]) (* Skip initial space *)
-                misc = if groups.[8] = "" then None
-                       else Some (groups.[8].[1..]) 
+                          else Some (groups.[6].[1],  // skip the dot.
+                                     if groups.[7] = "" then None
+                                     else Some (int (groups.[7])));
+                date = if groups.[8] = "" then None 
+                       else Some (groups.[8].[1..]) (* Skip initial space *)
+                misc = if groups.[9] = "" then None
+                       else Some (groups.[9].[1..]) 
             }
         else
-            let m = Regex.Match(cnString.ToUpper(), LCCN_PARTIAL_REGEX)
+            let m = Regex.Match(cnString, LCCN_PARTIAL_REGEX) // removed toUpper()
             if m.Success then
                 let groups = [ for g in m.Groups -> g.Value ]
                 {
@@ -103,12 +112,12 @@ module LCCN =
                               // Skip initial dot 
                               else Some (groups.[5].[1], 
                                          if groups.[5].Length > 2 
-                                         then Some (int (groups.[5].[2..]))
+                                         then Some (Decimal.Parse ("." + (groups.[5].[2..])))
                                          else None);
                     cutter2 = if groups.[6] = "" then None 
                               else Some (groups.[6].[0], 
-                                         if groups.[6].Length > 1 
-                                         then Some (int (groups.[6].[1..]))
+                                         if groups.[6].Length > 2 
+                                         then Some (int (groups.[6].[2..]))
                                          else None);
                     date = None;
                     misc = None
@@ -145,7 +154,8 @@ module CNRange = // nice if it could be a functor over types of CNs...
         else 
             {startCN = startCN; endCN = endCN}
     // TODO: might want to put all this fancy code somewhere else.
-    let patchCNSuffix (cnString: string) (suffixString: string) = 
+    /// Attempt to splice what might be the tail of a call number onto an existing one.
+    let patchCNSuffix cnString suffixString = 
         /// split CN string into segments by character class. Return two 
         /// lists, one with the char classes and one with the strings.
         let segmentCNString (cnString: string) = 
@@ -216,36 +226,61 @@ module CNRange = // nice if it could be a functor over types of CNs...
         cnString.[..pos] + suffixString *)
     let parse (s : string) = 
         let cnStrings = s.Split [|'-'|]
-        if Array.length cnStrings = 2 then
-            let startCNParsed  = LCCN.parse cnStrings.[0];
-            {startCN = startCNParsed
-             endCN = 
-                if String.IsNullOrEmpty(cnStrings.[1]) then 
-                    // TODO: will I ever be able to do the extension?
-                    startCNParsed 
+        if Array.length cnStrings = 1 then
+            {startCN = LCCN.parse cnStrings.[0]; 
+            endCN = LCCN.parse cnStrings.[0]}
+        else
+            let (startCNStr, endCNStr) = 
+                if Array.length cnStrings = 2 then (cnStrings.[0], cnStrings.[1])
+                // The funny case in the K's.
+                elif Array.length cnStrings = 4 && cnStrings.[0] = cnStrings.[2] then
+                    (cnStrings.[1], cnStrings.[3])
+                // TODO: 3-parters, like [|"CR5744.A2"; "CR5744.A3"; "Z"|]
                 else 
+                    raise <| CallNumberError 
+                     (sprintf "Unrecognized segment format for CN range: %A" cnStrings)
+            let startCNParsed  = LCCN.parse startCNStr; // if it throws, it throws.
+            let endCNParsed = 
+                if String.IsNullOrEmpty(endCNStr) then 
+                    startCNParsed 
+                else
                     try
-                        LCCN.parse cnStrings.[1]
+                        LCCN.parse endCNStr
                     with CallNumberError _ -> 
-                        // we just let this throw if it fails.
                         try
-                            let patched = patchCNSuffix cnStrings.[0] cnStrings.[1]
+                            let endStrPatched = patchCNSuffix cnStrings.[0] cnStrings.[1]
                             printfn "Successfully patched %s with suffix %s: %s" 
-                                    cnStrings.[0] cnStrings.[1] patched // DEBUG
-                            LCCN.parse patched
+                                    cnStrings.[0] cnStrings.[1] endStrPatched // DEBUG
+                            LCCN.parse endStrPatched
                         with CallNumberError msg ->
                             printfn "Failed patch or parse: %s" msg
-                            startCNParsed // MAY CHANGE - just to get a result
-            }
-        elif Array.length cnStrings = 1 then
-            {startCN = LCCN.parse cnStrings.[0]; 
-             endCN = LCCN.parse cnStrings.[0]}
-        else 
-            raise <| CallNumberError 
-                     (sprintf "Wrong number of segments (%d) for CN range: %A" 
-                              (Array.length cnStrings) cnStrings)
+                            startCNParsed // should probably change
+            if endCNParsed >= startCNParsed
+            then {startCN = startCNParsed; endCN = endCNParsed}
+            else 
+                printfn "Warning: End of CN range %s isn't >= %s:" endCNStr startCNStr
+                // if they start with same call letters, swap and try,
+                // because there seem to be legit reversals: "JN1331 isn't after JN3295"
+                if startCNParsed.letters.[0] = endCNParsed.letters.[0]
+                then
+                    printfn "  Call letters are the same - swapping start and end" 
+                    {startCN = endCNParsed; endCN = startCNParsed}
+                else 
+                    try
+                        printfn "  Call letters not the same, trying patch"
+                        let endStrPatched = patchCNSuffix startCNStr endCNStr
+                        printfn "  Successfully patched %s with suffix %s: %s" 
+                                startCNStr endCNStr endStrPatched // DEBUG
+                        {startCN = startCNParsed; endCN = LCCN.parse endStrPatched}
+                    with CallNumberError msg ->
+                        printfn "ERROR: Failed patch or parse end call number:\n    %s" msg
+                        {startCN = startCNParsed; endCN = startCNParsed} // MAY CHANGE - just to get a result
+            
     let contains range cn =       // range.contains cn
         range.startCN <= cn && cn <= range.endCN
+            // Should I check "moreSpecific" if start and end are the same?
+            // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
+            || LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
     let isSubRange subrange range = 
         contains range subrange.startCN && contains range subrange.endCN
 
