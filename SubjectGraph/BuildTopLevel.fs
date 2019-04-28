@@ -39,12 +39,17 @@ let buildGraph () =
             subdividedName = SubjectNode.splitSubjectName subjName
             cnString = if row.``Call Num`` = "" then None
                            else Some row.``Call Num``
-            callNumRange = if row.``Call Num`` = "" then None
-                           else Some <| 
-                                try 
-                                    CNRange.parse (row.``Call Num``)
-                                with CallNumberError msg -> 
-                                    failwith msg
+            callNumRange = 
+                if row.``Call Num`` = "" then None
+                else 
+                    // Avoid parsing because these are only partial CNs.
+                    let cnStrings = row.``Call Num``.Split [|'-'|]
+                    let startCN = LCCN.lettersOnlyCN cnStrings.[0] 
+                    let endCN = 
+                        if cnStrings.Length = 1 
+                        then startCN
+                        else LCCN.lettersOnlyCN cnStrings.[1]
+                    Some (CNRange.create startCN endCN)
                                     
             // Don't need to add parents manually, done by call number!
             broader = new List<_>() // (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)

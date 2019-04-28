@@ -170,7 +170,8 @@ module SubjectGraph =
             uri = Uri "http://knowledgeincoding.net/classif/00top";
             name = "Top Subject"; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
             subdividedName = ["Top Subject"];
-            callNumRange = Some {startCN = LCCN.parse "A"; endCN = LCCN.parse "ZZ"};
+            callNumRange = Some {startCN = LCCN.lettersOnlyCN "A"; 
+                                 endCN = LCCN.lettersOnlyCN "ZZ"};
             cnString = Some "A-ZZ"; // just as a backup
             broader = new List<SubjectNode>(); // formerly SubjectNode list
             narrower = new List<SubjectNode>(); 

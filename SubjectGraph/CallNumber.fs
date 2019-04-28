@@ -7,15 +7,13 @@ open System.Text.RegularExpressions
 exception CallNumberError of string
 
 // BEST REGEX EVER 
-// ISSUE: Some Gutenberg records have ONLY the letters. Is that a valid CN? 
 // Still to check: how many digits can cutter numbers and decimals have? 
 // To fix: 1st cutter can be something besides letter + digits 
-// groups: 1: letters, 2: number, 3: decimal 4: rest1, 5: cutter1, 6: cutter2, 7: space+year 
 let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                  + " ?([0-9]{1,5})"         // g2: number // Removed optional space. Not in Class dataset.
-                 + "(\.[0-9]{1,4})? ?"      // g3: decimal
-                 + "((\.[A-Z][0-9]{1,5})"   // g4: rest, g5: cutter1
-                 + "([\. ][A-Z]([0-9]{1,4})?)?)?" // g6: cutter2, g7: cutter2 number // formerly one
+                 + "(\.[0-9]{1,5})? ?"      // g3: decimal
+                 + "((\.[A-Z](?:[0-9]{1,6})?)"   // g4: rest, g5: cutter1, 
+                 + "(?:[\. ]?([A-Z]([0-9]{1,6})?))?)?" // g6: cutter2, g7: cutter2 number // formerly one
                  + "( [0-9]{4}[a-z]?)?"     // g8: date
                  + "( [Vv]\. ?[0-9]+| [Cc]\. ?[0-9]+| [Pp]t\. ?[0-9]+| suppl.)?$" // g9: misc
 
@@ -68,6 +66,13 @@ module LCCN =
     let isCNLetters s = 
         let isAlpha c = 'A' <= c && c <= 'z'
         String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
+    let lettersOnlyCN letterStr = { letters = letterStr; 
+                                    number = None;
+                                    decimal = None;
+                                    cutter1 = None;
+                                    cutter2 = None;
+                                    date = None;
+                                    misc = None }
     let isLettersOnly (cn : LCCN) = 
         cn.number = None
     let show (cn : LCCN) = // might want to try monadic style with this too 
@@ -88,9 +93,13 @@ module LCCN =
                           else Some (decimal (groups.[3]));
                 cutter1 = if groups.[5] = "" then None 
                           // Skip initial dot 
-                          else Some (groups.[5].[1], Some (Decimal.Parse ("." + (groups.[5].[2..]))));
+                          else Some (groups.[5].[1], 
+                                     if groups.[5].Length > 2
+                                     then Some (Decimal.Parse ("." + (groups.[5].[2..])))
+                                     else None)
+                          ;
                 cutter2 = if groups.[6] = "" then None 
-                          else Some (groups.[6].[1],  // skip the dot.
+                          else Some (groups.[6].[0], 
                                      if groups.[7] = "" then None
                                      else Some (int (groups.[7])));
                 date = if groups.[8] = "" then None 
@@ -99,7 +108,8 @@ module LCCN =
                        else Some (groups.[9].[1..]) 
             }
         else
-            let m = Regex.Match(cnString, LCCN_PARTIAL_REGEX) // removed toUpper()
+            raise <| CallNumberError ("Could not parse LOC Call Number " + cnString)
+            (* let m = Regex.Match(cnString, LCCN_PARTIAL_REGEX) // removed toUpper()
             if m.Success then
                 let groups = [ for g in m.Groups -> g.Value ]
                 {
@@ -123,7 +133,7 @@ module LCCN =
                     misc = None
                 }
             else
-                raise <| CallNumberError ("Could not parse LOC Call Number " + cnString)
+                raise <| CallNumberError ("Could not parse LOC Call Number " + cnString) *)
     /// True if two call numbers are the same except for year and misc.
     let sameTitle cn1 cn2 = 
         cn1.letters = cn2.letters && cn1.number = cn2.number
