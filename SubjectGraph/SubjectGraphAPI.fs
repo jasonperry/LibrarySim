@@ -9,11 +9,12 @@ open Suave.Writers
 open Newtonsoft.Json
 open System.Web // HttpUtility.HtmlEncode
 
+open Common
 open BookTypes
 open SubjectGraph
 
 // TODO: put these in a configuration file.
-let listenIPs = ["127.0.0.1"; "192.168.0.13"]
+let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
 
 /// Immutable SubjectNode info returned by the API, to be directly JSONized 
 ///   and sent to the browser.
@@ -35,7 +36,7 @@ module SubjectsResult =
     narrower = node.narrower 
       |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
       |> List.ofSeq;
-    cnRange = defaultArg node.cnString ""
+    cnRange = node.cnString |? ""
     booksUnder = node.booksUnder
   }
   let toHtml (sr : SubjectsResult) = 
@@ -68,7 +69,7 @@ module SubjectsResult =
 // TODO: monadize the error handling.  -> WebResult string
 // The ^^ is the "request combinator"
 let getSubjectResult g q = 
-  defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
+   Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
   |> fun uriStr -> 
     (*if uriStr = "top" then 
       SubjectsResult.topLevel g
@@ -100,7 +101,7 @@ module BooksResult =
     + "</div>"
 
 let getBookResult (g: SubjectGraph) q = 
-  defaultArg (Option.ofChoice (q ^^ "uri")) "Unrecognized variable" 
+  Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
   |> fun uriStr -> 
          if uriStr = "top" then
              {

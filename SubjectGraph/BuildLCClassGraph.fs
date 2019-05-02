@@ -19,10 +19,13 @@ open System.IO.Compression
 open System.Xml
 open FSharp.Data
 
+open Common
 open BookTypes
 open CallNumber
 open SubjectGraph
-open BuildTopLevel
+// open BuildTopLevel // It's passed in now.
+
+let (|?) = defaultArg
 
 let outputGraphFileName = "output/ClassGraph.sgb"
 
@@ -131,45 +134,45 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
         callNumCount <- 0
         for datafield in record.Datafields do
             if datafield.Tag = 10 then
-                // TODO: remove the space in the control number.
                 controlNumber <- getSingleSubfield datafield "a"
-                // debug for the "Arizona problem"
-                (*if controlNumber.Value = "CF 94087466" then
-                    Logger.Info "^^^ Adding Arizona"
-                elif controlNumber.Value = "CF 99431990" then
-                    Logger.Info "^^^ Adding Arizona child"
-                elif controlNumber.Value = "CF 94087639" then
-                    Logger.Info "^^^ Adding Arizona greatgrandchild"
-                elif controlNumber.Value = "CF 99432215" then
-                    Logger.Info "^^^ Adding Arizona grandchild"
-                else () *)
+                // remove the space.
+                match controlNumber with
+                | Some s -> controlNumber <- Some (s.Replace (" ", ""))
+                | None -> ()
             if datafield.Tag = 153 then
-                // Some have alt call numbers at "c"
-                let tableField = getSingleSubfield datafield "z"
+                // attempt to monadize
+                (*cnRangeStr <- maybe {   // Wild! mutable assignment from monad!
+                    let! tableField = getSingleSubfield datafield "z"
+                    let! startField = getSingleSubfield datafield "a"
+                    let! endField = getSingleSubfield datafield "c"
+                    let! lcCallNumStart = if tableField.Contains("-")
+                                          then None 
+                                          else Some (tableField + startField)
+                                          |> Option.orElse (Some startField)   
+                    let! lcCallNumEnd =  if tableField.Contains("-")
+                                         then None
+                                         else Some (tableField+endField)
+                                         |> Option.orElse (Some endField)
+                                         |> Option.orElse (Some startField)
+                    return (lcCallNumStart + "-" + lcCallNumEnd)
+                } *)
+                // Note: Some have alt call numbers at "c". How to deal? or is it a coding error?
+                let tableField = getSingleSubfield datafield "z" |? ""
                 let lcCallNumStart = // Option.lift2 (+) tableField (getSingleSubfield datafield "a")
                     match getSingleSubfield datafield "a" with 
-                        | None -> None
-                        | Some a -> match tableField with
-                                    | None -> Some a
-                                    | Some z -> Some (z+a)
+                    | None -> None
+                    | Some a -> if tableField.Contains("-") then None else Some (tableField + a)
                 let lcCallNumEnd = // getSingleSubfield datafield "c"
                     match getSingleSubfield datafield "c" with 
-                        | None -> None
-                        | Some c -> match tableField with
-                                    | None -> Some c
-                                    | Some z -> Some (z+c)
+                    | None -> None
+                    | Some c -> if tableField.Contains("-") then None else Some (tableField + c)
                 cnRangeStr <- 
-                    // TODO: Monadize
                     match lcCallNumStart with 
                         | Some startStr -> 
                             match lcCallNumEnd with
                                 | Some endStr -> Some (startStr + "-" + endStr)
                                 | None -> Some startStr
-                        | None -> None
-                (*try 
-                    LCCN.parse(lcCallNum.Value)  |> ignore // >>= ?
-                with 
-                    | _ -> printfn "Could not parse CN: %s" lcCallNum.Value *)
+                        | None -> None 
                 subjectNames.AddRange(getAllSubfields datafield "h")
                 subjectNames.AddRange(getAllSubfields datafield "j")
                 callNumCount <- callNumCount + 1
@@ -178,7 +181,9 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
             Logger.Error <| "No call number entry (153) or string for record " + controlNumber.Value
         elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Table for") then
             // TODO: just try to parse the CN here, and skip if it fails.
-            Logger.Info <| "Skipping 'table for' entry " + (defaultArg controlNumber "")
+            Logger.Info <| "Skipping 'table for' entry " + (controlNumber |? "")
+        elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then
+            Logger.Info <| "Skipping 'Learned societies' table for entry " + (controlNumber |? "")
         else 
             insertNode theGraph {
                 uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber.Value);

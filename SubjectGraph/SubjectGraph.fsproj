@@ -4,6 +4,7 @@
     <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Common.fs" />
     <Compile Include="Logger.fs" />
     <Compile Include="CallNumber.fs" />
     <Compile Include="BookTypes.fs" />

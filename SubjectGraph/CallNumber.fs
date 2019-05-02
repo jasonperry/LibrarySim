@@ -4,6 +4,8 @@ open System
 open System.Collections.Generic
 open System.Text.RegularExpressions
 
+open Common
+
 exception CallNumberError of string
 
 // BEST REGEX EVER 
@@ -29,7 +31,6 @@ let applyOption x someFn noThing =
     | Some v -> someFn v
     | None -> noThing
 
-let (|?) = defaultArg
 
 /// The LCCN Record type. TODO: Call number interface for other types.
 type LCCN = {
@@ -237,6 +238,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
     let parse (s : string) = 
         let cnStrings = s.Split [|'-'|]
         if Array.length cnStrings = 1 then
+            // Same for start and end. If it won't parse, there's nothing we can do.
             {startCN = LCCN.parse cnStrings.[0]; 
             endCN = LCCN.parse cnStrings.[0]}
         else
@@ -253,38 +255,36 @@ module CNRange = // nice if it could be a functor over types of CNs...
             let endCNParsed = 
                 if String.IsNullOrEmpty(endCNStr) then 
                     startCNParsed 
+                // If doesn't start with same letter as first, also patch.
+                elif startCNStr.[0] <> endCNStr.[0] then
+                    // TODO: pull this out as a function
+                    try
+                        printfn "Initial letters don't match (%s,%s), trying patch: " startCNStr endCNStr
+                        let endStrPatched = patchCNSuffix cnStrings.[0] cnStrings.[1]
+                        printfn "    Successfully patched %s with suffix %s: %s" 
+                                cnStrings.[0] cnStrings.[1] endStrPatched // DEBUG
+                        LCCN.parse endStrPatched
+                    with CallNumberError msg ->
+                        printfn "    Failed patch or parse: %s" msg
+                        startCNParsed // What else could we do here?
                 else
                     try
                         LCCN.parse endCNStr
                     with CallNumberError _ -> 
                         try
+                            printfn "End call number (%s) didn't parse, trying patch" endCNStr
                             let endStrPatched = patchCNSuffix cnStrings.[0] cnStrings.[1]
-                            printfn "Successfully patched %s with suffix %s: %s" 
+                            printfn "    Successfully patched %s with suffix %s: %s" 
                                     cnStrings.[0] cnStrings.[1] endStrPatched // DEBUG
                             LCCN.parse endStrPatched
                         with CallNumberError msg ->
-                            printfn "Failed patch or parse: %s" msg
+                            printfn "    Failed patch or parse: %s" msg
                             startCNParsed // should probably change
             if endCNParsed >= startCNParsed
             then {startCN = startCNParsed; endCN = endCNParsed}
             else 
-                printfn "Warning: End of CN range %s isn't >= %s:" endCNStr startCNStr
-                // if they start with same call letters, swap and try,
-                // because there seem to be legit reversals: "JN1331 isn't after JN3295"
-                if startCNParsed.letters.[0] = endCNParsed.letters.[0]
-                then
-                    printfn "  Call letters are the same - swapping start and end" 
-                    {startCN = endCNParsed; endCN = startCNParsed}
-                else 
-                    try
-                        printfn "  Call letters not the same, trying patch"
-                        let endStrPatched = patchCNSuffix startCNStr endCNStr
-                        printfn "  Successfully patched %s with suffix %s: %s" 
-                                startCNStr endCNStr endStrPatched // DEBUG
-                        {startCN = startCNParsed; endCN = LCCN.parse endStrPatched}
-                    with CallNumberError msg ->
-                        printfn "ERROR: Failed patch or parse end call number:\n    %s" msg
-                        {startCN = startCNParsed; endCN = startCNParsed} // MAY CHANGE - just to get a result
+                printfn "Warning: Start of CN range %s isn't <= %s: swapping" startCNStr endCNStr
+                {startCN = endCNParsed; endCN = startCNParsed}
             
     let contains range cn =       // range.contains cn
         range.startCN <= cn && cn <= range.endCN

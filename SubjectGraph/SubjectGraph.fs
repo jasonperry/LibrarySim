@@ -4,6 +4,7 @@ module SubjectGraph
 open System
 open System.Collections.Generic
 
+open Common
 open BookTypes
 open CallNumber
 open SparqlQuery
@@ -410,8 +411,6 @@ let topicForComplexSubject subjectString = None
 // Way to construct a call number range when there isn't one: take min and
 // max of narrower ones (assuming the letters match) *)
 
-
-let (|?) = defaultArg
 let newSubjectUri (graph: SubjectGraph) label callLetters = 
     // TODO: make sure we don't repeat, have a counter in the graph to keep track.
     // call num then five digits? count backwards?
