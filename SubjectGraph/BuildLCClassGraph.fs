@@ -25,8 +25,6 @@ open CallNumber
 open SubjectGraph
 // open BuildTopLevel // It's passed in now.
 
-let (|?) = defaultArg
-
 let outputGraphFileName = "output/ClassGraph.sgb"
 
 (* if fsi.CommandLineArgs.Length < 2 then
