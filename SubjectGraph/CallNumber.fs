@@ -168,7 +168,9 @@ module CNRange = // nice if it could be a functor over types of CNs...
             {startCN = startCN; endCN = endCN}
 
     let toString range = 
-        (LCCN.toString range.startCN) + "-" + (LCCN.toString range.endCN)
+        (LCCN.toString range.startCN) 
+        + (if range.endCN = range.startCN 
+           then "" else "-" + (LCCN.toString range.endCN))
 
     // TODO: might want to put all this fancy code somewhere else.
     /// Attempt to splice what might be the tail of a call number onto an existing one.
@@ -296,8 +298,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
             
     let contains range cn =       // range.contains cn
         range.startCN <= cn && cn <= range.endCN
-            // Should I check "moreSpecific" if start and end are the same?
-            // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
+        // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
         || range.startCN <= cn && LCCN.moreSpecific cn range.endCN
         //|| LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
 
