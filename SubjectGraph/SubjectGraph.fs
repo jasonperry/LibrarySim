@@ -230,11 +230,13 @@ module SubjectGraph =
                 | None -> 
                     newNode.broader.Add atnode
                     // nothing added to newNode's children.
-                    atnode.narrower.Add newNode
+                    // atnode.narrower.Add newNode // don't do it twice!
                     (atnode, [])
         let (parent, oldchildren) = insert graph.topNode
         // Remove children from grandparent node (couldn't modify atnode in the let rec)
         List.iter (fun child -> parent.narrower.Remove child |> ignore) oldchildren
+        // Oops, I forgot to add as a child of the parent!
+        parent.narrower.Add newNode
         // Add to the indexes. 
         graph.subjectPrefixIndex.Add newNode // Will this work if it's empty?
         graph.uriIndex.Add(newNode.uri, newNode)
