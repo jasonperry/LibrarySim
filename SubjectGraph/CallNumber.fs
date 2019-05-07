@@ -32,7 +32,7 @@ type LCCN = {
     number : int option; // optional for partial CNs; should be in all complete CNs.
     decimal : Decimal option;
     cutter1 : (char * Decimal option) option; 
-    cutter2 : (char * int option) option;
+    cutter2 : (char * Decimal option) option;
     date : string option; // because of "2000b", etc. Lexicographic sorting should work? 
     misc : string option; // "v.1", "c.2", "suppl.", "Pt.1" 
 } 
@@ -75,11 +75,11 @@ module LCCN =
 
     let toString (cn : LCCN) = // might want to try monadic style with this too 
         cn.letters + map_or "" cn.number string
-        + map_or "" cn.decimal string
+        + map_or "" cn.decimal (fun d -> (string d).[1..]) // no leading zero
         + map_or "" cn.cutter1 (fun x -> 
-            "." + string (fst x) + map_or "" (snd x) string)
+            "." + string (fst x) + map_or "" (snd x) (fun d -> (string d).[2..])) // no leading zero or dot
         + map_or "" cn.cutter2 (fun x -> 
-            " " + string (fst x) + map_or "" (snd x) string)
+            " " + string (fst x) + map_or "" (snd x) (fun d -> (string d).[2..])) // no zero or dot
         + map_or "" cn.date string
 
     let parse (cnString : string) = 
@@ -102,7 +102,7 @@ module LCCN =
                 cutter2 = if groups.[6] = "" then None 
                           else Some (groups.[6].[0], 
                                      if groups.[7] = "" then None
-                                     else Some (int (groups.[7])));
+                                     else Some (Decimal.Parse ("." + groups.[7])));
                 date = if groups.[8] = "" then None 
                        else Some (groups.[8].[1..]) (* Skip initial space *)
                 misc = if groups.[9] = "" then None
@@ -141,14 +141,16 @@ module LCCN =
         && cn1.decimal = cn2.decimal && cn1.cutter1 = cn2.cutter1
         && cn1.cutter2 = cn2.cutter2
     /// True if first call number is more specific but otherwise equal. Equal is false.
-    /// TODO: Should not be needed, in the ideal domain model.
+    /// Needed for correct range containment, using only <= misses edge cases.
     let moreSpecific cn1 cn2 = 
-        cn1.letters = cn2.letters && cn1.number = cn2.number 
-        && (cn1.decimal.IsSome && cn2.decimal.IsNone    // can short-circuit here
-            || (cn1.decimal = cn2.decimal &&            // Okay if they're None?
-                (cn1.cutter1.IsSome && cn2.cutter1.IsNone
-                 || (cn1.cutter1 = cn1.cutter1 && 
-                     (cn1.cutter2.IsSome && cn1.cutter2.IsNone)))))
+        cn1.letters = cn2.letters
+        && (cn1.number.IsSome && cn2.number.IsNone // if this is true, we're done
+            || cn1.number = cn2.number 
+            && (cn1.decimal.IsSome && cn2.decimal.IsNone 
+                || (cn1.decimal = cn2.decimal 
+                && (cn1.cutter1.IsSome && cn2.cutter1.IsNone
+                    || (cn1.cutter1 = cn2.cutter1 // FIXME: need to check decimal separately
+                    && (cn1.cutter2.IsSome && cn1.cutter2.IsNone))))))
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 
         cn1.letters <= cn2.letters 
@@ -296,7 +298,8 @@ module CNRange = // nice if it could be a functor over types of CNs...
         range.startCN <= cn && cn <= range.endCN
             // Should I check "moreSpecific" if start and end are the same?
             // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
-            || LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
+        || range.startCN <= cn && LCCN.moreSpecific cn range.endCN
+        //|| LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
 
     let isSubRange subrange range = 
         contains range subrange.startCN && contains range subrange.endCN
