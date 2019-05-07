@@ -79,7 +79,9 @@ let processRecords (data : Marc21Slim.Collection) =
                                     .Value
                                     .Replace(" -- ", "--")
                 printfn "Subject (%d): %s" datafield.Tag subjName
-                subjects.Add({ name = subjName; uri = None})
+                subjects.Add(
+                    // No call number known for the subject yet, may be replaced.
+                    { name = subjName; cnRange = None; uri = None})
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
             elif datafield.Tag = 50 then

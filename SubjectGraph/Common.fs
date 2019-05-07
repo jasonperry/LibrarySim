@@ -2,6 +2,11 @@ module Common
 
 let (|?) = defaultArg
 
+let map_or defval optval someFn  = 
+    match optval with
+    | Some v -> someFn v
+    | None -> defval
+
 // Computation expression for the Option monad.
 type MaybeBuilder() =
 

@@ -3,12 +3,15 @@ module BookTypes
 
 open CallNumber
 
-[<Struct>] // Will this make it more efficient? Measure!
+/// A record about a subject, not dependent on SubjectGraph.
+[<Struct>] // Does "struct" make it more efficient? Measure!
 type SubjectInfo = {
   uri : System.Uri option;
+  cnRange : LCCNRange option;
   name : string
 }
 
+/// Primary type for information about a single catalog item.
 type BookRecord = {
     Title: string
     Authors: string
@@ -19,6 +22,7 @@ type BookRecord = {
 }
 
 module BookRecord = 
+    /// Replace the subject information for a book with a new record.
     let updateSubject record (sinfo : SubjectInfo) = 
         let rec update infolist = 
             match infolist with

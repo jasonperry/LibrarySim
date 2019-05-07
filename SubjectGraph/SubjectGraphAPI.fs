@@ -11,6 +11,7 @@ open System.Web // HttpUtility.HtmlEncode
 
 open Common
 open BookTypes
+open CallNumber
 open SubjectGraph
 
 // TODO: put these in a configuration file.
@@ -28,31 +29,40 @@ type SubjectsResult = {
 }
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
-    thisSubject = {uri = Some node.uri; name = node.name};
+    thisSubject = {uri = Some node.uri; cnRange = node.callNumRange; name = node.name};
     broader = node.broader 
-      |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
+      |> Seq.map (fun nd -> 
+          {uri = Some nd.uri; cnRange = nd.callNumRange; name = nd.name})
       |> List.ofSeq;
       // Q: Is there a way to cast this to not convert the whole list? I've tried...
     narrower = node.narrower 
-      |> Seq.map (fun nd -> {uri = Some nd.uri; name = nd.name})
+      |> Seq.map (fun nd -> 
+          {uri = Some nd.uri; cnRange = nd.callNumRange; name = nd.name})
       |> List.ofSeq;
     cnRange = node.cnString |? ""
     booksUnder = node.booksUnder
   }
+
   let toHtml (sr : SubjectsResult) = 
-    let makeSubjectInfoLink (si : SubjectInfo) = 
-      // TODO: find a way to get the app's own URL...from the config?
-      "<a href=\"http://127.0.0.1:8080/browse?uri=" 
-      + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) + "</a>"
-    
-    (if List.isEmpty sr.broader then 
-         "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/classif/00top\">Top level</a></p>" 
-     else
-         "Up: " + (String.concat " " (List.map makeSubjectInfoLink sr.broader)))
-    + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
-    + "<p>Call number range: " + sr.cnRange + "<br />"
-    + "Entries under this heading: " + (string sr.booksUnder) + "</p>"
-    + String.concat "<br />" (List.map makeSubjectInfoLink sr.narrower)
+      let formatSubjectInfo (si : SubjectInfo) = 
+          // TODO: find a way to get the app's own URL...from the config?
+          "<td>" + (map_or "[NO CN]" si.cnRange CNRange.toString) + "</td>"
+          + "<td><a href=\"http://127.0.0.1:8080/browse?uri=" 
+          + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) + "</a></td>"
+      (if List.isEmpty sr.broader then 
+          "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/classif/00top\">Top level</a></p>" 
+       else
+          "<table><tr><td>Up: </td>" 
+          + (String.concat "</td><td>" (List.map formatSubjectInfo sr.broader))
+          + "</td></tr></table>")
+      + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
+      + "<p>Call number range: " + sr.cnRange + "<br />"
+      + "Entries under this heading: " + (string sr.booksUnder) + "</p>"
+      + "<table><tr>"
+      + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
+      + "</tr><table>"
+
+
 
   /// Construct a result object corresponding to the top level. No longer needed?
   (* let topLevel (g : SubjectGraph) = 
@@ -65,6 +75,7 @@ module SubjectsResult =
       booksUnder = List.sumBy (fun (nd : SubjectNode) -> nd.booksUnder) topSubjects
       cnRange = "A-Z"
     } *)
+// end module SubjectsResult
 
 // TODO: monadize the error handling.  -> WebResult string
 // The ^^ is the "request combinator"
@@ -85,27 +96,30 @@ type BooksResult = {
   books : BookRecord list
 }
 module BooksResult = 
+
   let ofNode (node : SubjectNode) = {
-    thisSubject = {uri = Some node.uri; name = node.name};
+    thisSubject = {uri = Some node.uri; cnRange = node.callNumRange; name = node.name};
     books = List.ofSeq node.books
   }
+
   let toHtml (bres : BooksResult) = 
     let bookfmt (br : BookRecord) = 
-        "<b>" + HttpUtility.HtmlEncode(br.Title) + "</b><br />"
-        + HttpUtility.HtmlEncode(br.Authors) + "<br />"
+        "<td><b>" + HttpUtility.HtmlEncode(br.Title) + "</b></td>"
+        + "<td>" + HttpUtility.HtmlEncode(br.Authors) + "</td>"
         + match br.Link with 
-          | Some link -> "<a href=\"" + link + "\">" + link + "</a>"
+          | Some link -> "<td><a href=\"" + link + "\">" + link + "</a></td>"
           | None -> "(no link)"
-    "<div class=\"booklisting\">"
-    + (String.concat "" (List.map (fun br -> "<p>" + bookfmt br + "</p>") bres.books))
-    + "</div>"
+    "<div class=\"booklisting\"><table><tr>"
+    + (String.concat "</tr><tr>" (List.map bookfmt bres.books))
+    + "</tr></table></div>"
 
 let getBookResult (g: SubjectGraph) q = 
   Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
   |> fun uriStr -> 
          if uriStr = "top" then
              {
-               thisSubject = {uri = None; name = "Top Level"};
+               // FIXME: The cnRange setting is a hack, should it be better?
+               thisSubject = {uri = None; cnRange = Some (CNRange.parse "A-ZZ"); name = "Top Level"};
                books = []
              }
          else 
@@ -134,6 +148,8 @@ let dispatch g =
       POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
           path "/goodbye" >=> Successful.OK "Good bye POST" ] ]
+
+// end module BooksResult
 
 [<EntryPoint>]
 let main argv =

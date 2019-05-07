@@ -481,7 +481,8 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
     if addBook then
         // Add URIs for the found subjects to the book record.
         let updatedBook = 
-            (List.map (fun (nd: SubjectNode) -> {name = nd.name; uri = Some nd.uri}) nodes)
+            (List.map (fun (nd: SubjectNode) -> 
+                {name = nd.name; cnRange = nd.callNumRange; uri = Some nd.uri}) nodes)
             |> List.fold BookRecord.updateSubject book 
         // update the booksUnder count upward.
         let rec updateCounts node = 

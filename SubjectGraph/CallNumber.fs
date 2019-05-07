@@ -26,12 +26,6 @@ let LCCN_PARTIAL_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
                          + "(\.[A-Z][0-9]{0,5})"   //  g5: cutter1 (maybe no number)
                          + "([\. ][A-Z][0-9]{0,4})?)?" // g6: cutter2 (maybe no number)
 
-let applyOption x someFn noThing = 
-    match x with
-    | Some v -> someFn v
-    | None -> noThing
-
-
 /// The LCCN Record type. TODO: Call number interface for other types.
 type LCCN = {
     letters : string;
@@ -63,10 +57,12 @@ module LCCN =
                   match cn.number with
                   | Some _ -> {cn with number = None}
                   | None -> cn
+
     /// If a string doesn't parse as LCCN, see if it looks like just the letters part (gutenberg)
     let isCNLetters s = 
         let isAlpha c = 'A' <= c && c <= 'z'
         String.forall isAlpha s && s.Length >= 1 && s.Length <= 3
+
     let lettersOnlyCN letterStr = { letters = letterStr; 
                                     number = None;
                                     decimal = None;
@@ -76,12 +72,16 @@ module LCCN =
                                     misc = None }
     let isLettersOnly (cn : LCCN) = 
         cn.number = None
-    let show (cn : LCCN) = // might want to try monadic style with this too 
-        cn.letters + string cn.number
-        + applyOption cn.decimal string ""
-        + applyOption cn.cutter1 (fun x -> "." + string (fst x) + string (snd x)) ""
-        + applyOption cn.cutter2 (fun x -> " " + string (fst x) + string (snd x)) ""
-        + applyOption cn.date string ""
+
+    let toString (cn : LCCN) = // might want to try monadic style with this too 
+        cn.letters + map_or "" cn.number string
+        + map_or "" cn.decimal string
+        + map_or "" cn.cutter1 (fun x -> 
+            "." + string (fst x) + map_or "" (snd x) string)
+        + map_or "" cn.cutter2 (fun x -> 
+            " " + string (fst x) + map_or "" (snd x) string)
+        + map_or "" cn.date string
+
     let parse (cnString : string) = 
         let m = Regex.Match(cnString, LCCN_REGEX)  // Removed ToUpper; fixes should be before.
         if m.Success then 
@@ -157,13 +157,17 @@ module LCCN =
 type LCCNRange = { 
     startCN : LCCN
     endCN : LCCN
-} // ToString?
+} 
 module CNRange = // nice if it could be a functor over types of CNs...
     let create startCN endCN = 
         if startCN > endCN then
             raise (CallNumberError "Illegal CN Range: Start Call Number is higher")
         else 
             {startCN = startCN; endCN = endCN}
+
+    let toString range = 
+        (LCCN.toString range.startCN) + "-" + (LCCN.toString range.endCN)
+
     // TODO: might want to put all this fancy code somewhere else.
     /// Attempt to splice what might be the tail of a call number onto an existing one.
     let patchCNSuffix cnString suffixString = 
@@ -235,7 +239,9 @@ module CNRange = // nice if it could be a functor over types of CNs...
         while sameClass cnString.[pos] suffixString.[0] do 
             pos <- pos - 1 
         cnString.[..pos] + suffixString *)
+
     let parse (s : string) = 
+        //printfn "Trying to parse CN %s" s
         let cnStrings = s.Split [|'-'|]
         if Array.length cnStrings = 1 then
             // Same for start and end. If it won't parse, there's nothing we can do.
@@ -291,6 +297,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
             // Should I check "moreSpecific" if start and end are the same?
             // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
             || LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
+
     let isSubRange subrange range = 
         contains range subrange.startCN && contains range subrange.endCN
 

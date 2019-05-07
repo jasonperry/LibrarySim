@@ -122,6 +122,7 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
     let mutable recordCount = 0
     let mutable withNoCallNum = 0
     let mutable callNumCount = 0
+    let mutable recordsAdded = 0
     for record in records do
         (*let recEnum = records.GetEnumerator()
         while recEnum.MoveNext() && recordCount < 20000 do 
@@ -183,6 +184,7 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
         elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then
             Logger.Info <| "Skipping 'Learned societies' table for entry " + (controlNumber |? "")
         else 
+            recordsAdded <- recordsAdded + 1
             insertNode theGraph {
                 uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber.Value);
                 name = SubjectNode.joinSubjectName (List.ofSeq subjectNames); 
@@ -212,6 +214,7 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
             printfn "============= %d\n%A\n" recordCount subjectNames
     printfn "Processed %d records"  recordCount 
     printfn "          %d with no call numbers" withNoCallNum
+    printfn "          %d added to graph" recordsAdded
     theGraph
 
 // Basically a SubjectGraph, but I'll need to pull from it.
