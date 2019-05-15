@@ -38,7 +38,9 @@ module SubjectsResult =
     narrower = node.narrower 
       |> Seq.map (fun nd -> 
           {uri = Some nd.uri; cnRange = nd.callNumRange; name = nd.name})
-      |> List.ofSeq;
+      |> List.ofSeq
+      |> List.sortWith (fun (si1: SubjectInfo) si2 -> 
+                            CNRange.compare si1.cnRange si2.cnRange)
     cnRange = node.cnString |? ""
     booksUnder = node.booksUnder
   }

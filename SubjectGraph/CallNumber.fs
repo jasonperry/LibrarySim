@@ -144,13 +144,20 @@ module LCCN =
     /// Needed for correct range containment, using only <= misses edge cases.
     let moreSpecific cn1 cn2 = 
         cn1.letters = cn2.letters
-        && (cn1.number.IsSome && cn2.number.IsNone // if this is true, we're done
+        && (cn1.number.IsSome && cn2.number.IsNone // any cases where number is none & rest isn't?
             || cn1.number = cn2.number 
-            && (cn1.decimal.IsSome && cn2.decimal.IsNone 
-                || (cn1.decimal = cn2.decimal 
-                && (cn1.cutter1.IsSome && cn2.cutter1.IsNone
-                    || (cn1.cutter1 = cn2.cutter1 // FIXME: need to check decimal separately
-                    && (cn1.cutter2.IsSome && cn1.cutter2.IsNone))))))
+            && (cn1.decimal.IsSome && cn2.decimal.IsNone && cn2.cutter1.IsNone
+                || cn1.decimal = cn2.decimal 
+                && (cn1.cutter1.IsSome && cn2.cutter1.IsNone && cn2.cutter2.IsNone
+                    || cn1.cutter1.IsSome && cn2.cutter1.IsSome 
+                    && (fst (cn1.cutter1.Value) = fst (cn2.cutter1.Value)
+                    && (snd (cn1.cutter1.Value)).IsSome && (snd (cn2.cutter1.Value)).IsNone
+                    && cn2.cutter2.IsNone // Probably can't have a 2nd cutter without the first?
+                    || cn1.cutter1.Value = cn2.cutter1.Value // whole thing
+                    && (cn1.cutter2.IsSome && cn1.cutter2.IsNone
+                        || cn1.cutter2.IsSome && cn2.cutter2.IsSome 
+                        && fst (cn1.cutter2.Value) = fst (cn2.cutter2.Value)
+                        && (snd (cn1.cutter2.Value)).IsSome && (snd(cn2.cutter2.Value)).IsNone)))))
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 
         cn1.letters <= cn2.letters 
@@ -304,6 +311,17 @@ module CNRange = // nice if it could be a functor over types of CNs...
 
     let isSubRange subrange range = 
         contains range subrange.startCN && contains range subrange.endCN
+    /// Comparison function used to sort output.
+    let compare ropt1 ropt2 = 
+        match ropt1 with 
+        | None -> if Option.isNone ropt2 then 0 else -1
+        | Some range1 -> 
+            match ropt2 with
+            | None -> 1
+            | Some range2 -> 
+                if range1.startCN < range2.startCN then -1
+                elif range1.startCN = range2.startCN then 0
+                else 1
 
 /// Tree for parent/child relationships of CN Ranges.
 /// Lookup of existing nodes can be done in SubjectGraph.CNIndex

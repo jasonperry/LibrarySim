@@ -160,11 +160,13 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
                 let lcCallNumStart = // Option.lift2 (+) tableField (getSingleSubfield datafield "a")
                     match getSingleSubfield datafield "a" with 
                     | None -> None
-                    | Some a -> if tableField.Contains("-") then None else Some (tableField + a)
-                let lcCallNumEnd = // getSingleSubfield datafield "c"
+                    | Some _ when tableField.Contains("-") -> None
+                    | Some a -> Some (tableField + a)
+                let lcCallNumEnd = 
                     match getSingleSubfield datafield "c" with 
                     | None -> None
-                    | Some c -> if tableField.Contains("-") then None else Some (tableField + c)
+                    | Some c when tableField.Contains("-") -> None
+                    | Some c -> Some (tableField + c)
                 cnRangeStr <- 
                     match lcCallNumStart with 
                         | Some startStr -> 
