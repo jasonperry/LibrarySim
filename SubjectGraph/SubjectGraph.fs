@@ -9,7 +9,7 @@ open BookTypes
 open CallNumber
 open SparqlQuery
 
-/// Where to put this?
+/// Where to put this? Either in common or NamePrefixIndex.
 let rec isStrictPrefix list1 list2 = 
     match (list1, list2) with
         | (_, []) -> false
@@ -46,7 +46,7 @@ module SubjectNode =
         |> Array.filter (fun s -> s <> "")
         |> List.ofArray
 
-/// A class with methods for finding subjects by prefix.
+/// A class with methods for finding subjects by prefix. Not currently used in LCCN-based graph.
 type NamePrefixIndex = private {
     theMap : Dictionary<string, List<SubjectNode>>
 } with 
@@ -165,6 +165,7 @@ type SubjectGraph = {
 
 /// Functions relevant to the SubjectGraph data structure.
 module SubjectGraph = 
+
     let emptyGraph () =  
         // TODO: parameterize by catalog type. LOC only for now.
         let topNode = {
@@ -191,6 +192,7 @@ module SubjectGraph =
             subjectPrefixIndex = NamePrefixIndex.Create ();
             uriIndex = uriIndex
         }
+
     /// Probably more efficient than maintaining the prefixIndex, but not sufficient.
     /// TODO: move this into a "SubjectSegmentIndex" module, like with CNIndex.
     let findLongestPrefixSubj graph (splitSubj : string list) = 
@@ -203,6 +205,22 @@ module SubjectGraph =
                         graph.subjectNameIndex.[label]
                     else findit slist.[..List.length slist - 2]
         findit splitSubj
+
+    /// Return the node for the spot in the graph an item should hang on.
+    /// Is total; if CN never falls in a range it will go with the given node.
+    let findParentByCallNumber graph (cn: LCCN) =
+        let rec searchParent (atnode: SubjectNode) = 
+            let candidates = 
+                (*Seq.filter (mapOr (fun range -> CNRange.contains range cn) false) 
+                           atnode.narrower *)
+                Seq.filter (fun nd -> if Option.isNone nd.callNumRange then false
+                                      else CNRange.contains nd.callNumRange.Value cn) 
+                           atnode.narrower
+            match Seq.tryHead candidates with 
+            | Some node -> searchParent node 
+            | None -> atnode
+        searchParent graph.topNode
+
     /// Totally awesome, perfect, clear, generic node insertion function.
     /// Dependency injection! an isChild comparison function: CNRange.isSubRange
     /// Will not create a new top node.
@@ -471,7 +489,25 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
     
         // Then add this to the broader's narrower list. 
         // Also a query to get variant names; add them to the hash table 
-    
+
+/// Add a book to the graph by call number, returning updated item record if 
+/// successful.
+let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
+    match item.LCCallNum with
+    | None -> None
+    | Some cn -> 
+        let parentNode = SubjectGraph.findParentByCallNumber graph cn
+        parentNode.books.Add item
+        let rec updateCounts node = 
+            node.booksUnder <- node.booksUnder + 1
+            Seq.iter updateCounts node.broader
+        updateCounts parentNode
+        BookRecord.updateSubject item {
+            name = parentNode.name; 
+            cnRange = parentNode.callNumRange;
+            uri = Some parentNode.uri
+        } |> Some
+
 /// Add a book's subjects to a graph (and the book too if selected)
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
     // Try to add a subject for each name, get node back 
@@ -489,7 +525,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
         // update the booksUnder count upward.
         let rec updateCounts node = 
             node.booksUnder <- node.booksUnder + 1
-            printf "."
+            //printf "."
             Seq.iter updateCounts node.broader
         for node in nodes do
             // Only add a book under a node if there's no narrower one.

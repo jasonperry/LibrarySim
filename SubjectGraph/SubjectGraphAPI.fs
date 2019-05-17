@@ -13,6 +13,7 @@ open Common
 open BookTypes
 open CallNumber
 open SubjectGraph
+open MarcXmlToBooks
 
 // TODO: put these in a configuration file.
 let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
@@ -25,7 +26,7 @@ type SubjectsResult = {
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
   cnRange : string;
-  booksUnder : int
+  booksUnder : int // TODO: the actual books (or go back to the graph?)
 }
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
@@ -48,7 +49,7 @@ module SubjectsResult =
   let toHtml (sr : SubjectsResult) = 
       let formatSubjectInfo (si : SubjectInfo) = 
           // TODO: find a way to get the app's own URL...from the config?
-          "<td>" + (map_or "[NO CN]" si.cnRange CNRange.toString) + "</td>"
+          "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
           + "<td><a href=\"http://127.0.0.1:8080/browse?uri=" 
           + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) + "</a></td>"
       (if List.isEmpty sr.broader then 
@@ -64,9 +65,7 @@ module SubjectsResult =
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
       + "</tr><table>"
 
-
-
-  /// Construct a result object corresponding to the top level. No longer needed?
+  /// Construct a result object corresponding to the top level. Now we have a top node
   (* let topLevel (g : SubjectGraph) = 
     let topSubjects = List.ofSeq (g.topLevel)
     {
@@ -118,12 +117,16 @@ module BooksResult =
 let getBookResult (g: SubjectGraph) q = 
   Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
   |> fun uriStr -> 
-         if uriStr = "top" then
-             {
+         if uriStr = "top" then 
+           {
                // FIXME: The cnRange setting is a hack, should it be better?
-               thisSubject = {uri = None; cnRange = Some (CNRange.parse "A-ZZ"); name = "Top Level"};
+               thisSubject = {
+                 uri = None; 
+                 cnRange = Some (CNRange.parse "A-ZZ"); 
+                 name = "Top Level"
+               };
                books = []
-             }
+           }
          else 
              BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
 
@@ -156,11 +159,16 @@ let dispatch g =
 [<EntryPoint>]
 let main argv =
   match argv.[0] with 
-  | "buildLCClassGraph" -> 
-      BuildLCClassGraph.buildGraph argv.[1]
-      0
   | "buildTopLevel" -> 
       BuildTopLevel.writeTopLevelGraph ()
+      0
+  | "buildLCClassGraph" -> 
+      BuildLCClassGraph.buildGraph argv.[1] "output/ClassGraph.sgb"
+      0
+  | "addBooksToClassGraph" -> 
+      let graph = loadGraph argv.[1]
+      addBooksToClassGraph graph argv.[2]
+      saveGraph graph "output/BooksAndClassGraph.sgb"
       0
   | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]

@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="Common.fs" />
     <Compile Include="Logger.fs" />
+    <Compile Include="MarcXml.fs" />
     <Compile Include="CallNumber.fs" />
     <Compile Include="BookTypes.fs" />
     <Compile Include="SparqlQuery.fs" />

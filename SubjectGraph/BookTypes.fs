@@ -1,6 +1,7 @@
 /// Global types related to book records (including subject info).
 module BookTypes
 
+open System // Uri
 open CallNumber
 
 /// A record about a subject, not dependent on SubjectGraph.
@@ -18,6 +19,7 @@ type BookRecord = {
     LCCallNum : LCCN option
     LCLetters: string option
     Subjects: SubjectInfo list
+    Uri : Uri
     Link: string option
 }
 

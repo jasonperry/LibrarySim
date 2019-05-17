@@ -20,24 +20,17 @@ open System.Xml
 open FSharp.Data
 
 open Common
+open MarcXml
 open BookTypes
 open CallNumber
 open SubjectGraph
 // open BuildTopLevel // It's passed in now.
 
-let outputGraphFileName = "output/ClassGraph.sgb"
 
 (* if fsi.CommandLineArgs.Length < 2 then
     printfn "Need MarcXML.gz file argument"
     exit(1)
 let xmlfile = fsi.CommandLineArgs.[1] *)
-
-[<Literal>]
-let DATADIR = @"./indexdata/"
-[<Literal>]
-let XMLSAMPLE = DATADIR + "MarcRecordSample.xml"
-/// Giving a constant file name initializes the type provider magic.
-type Marc21ClassRecord = XmlProvider<XMLSAMPLE> 
 
 let mutable nodeCount = 0
 
@@ -83,41 +76,8 @@ let insertNode (graph: SubjectGraph) node =
             //  current solution: just find the top level in post-processing.
 
 
-let getSingleSubfield (datafield : Marc21ClassRecord.Datafield) code = 
-    (* Still awkward, but you can't return from a for loop. *)
-    match Array.tryFindIndex (fun (sf : Marc21ClassRecord.Subfield) -> 
-                              sf.Code = code)
-                             datafield.Subfields with
-        | Some i -> Some (datafield.Subfields.[i].Value)
-        | None -> None
-
-let getAllSubfields (datafield : Marc21ClassRecord.Datafield) code = 
-    datafield.Subfields
-    |> Array.filter (fun (sf : Marc21ClassRecord.Subfield) -> sf.Code = code) 
-    |> Array.map (fun (sf : Marc21ClassRecord.Subfield) -> sf.Value)
-
-/// NOT USED. Earlier attempt to get XML by pieces?
-let rec nextRecord (reader : XmlReader) = 
-    if reader.Read() then
-        match reader.NodeType with
-            | XmlNodeType.Element -> 
-                if reader.Name = "record" then
-                    Some (Marc21ClassRecord.Parse (reader.ReadOuterXml()))
-                else nextRecord reader
-            | _ -> nextRecord reader
-    else None
-
-/// Generator to parse individual MarcXML records from a stream.
-let readRecords (reader : XmlReader) = 
-    seq {
-        while (reader.Read()) do
-            if reader.NodeType = XmlNodeType.Element then
-                if reader.Name = "record" then
-                    yield (Marc21ClassRecord.Parse (reader.ReadOuterXml()))
-    }
-
 /// Create SubjectNode objects and send them to insertNode.
-let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) = 
+let addClassRecords theGraph (records : MarcXmlType.Record seq) = 
     // let theGraph = SubjectGraph.emptyGraph()
     let mutable recordCount = 0
     let mutable withNoCallNum = 0
@@ -132,6 +92,8 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
         let subjectNames = new List<string>()
         callNumCount <- 0
         for datafield in record.Datafields do
+            // Is it always okay to get the control number from the datafield
+            //   instead of control field?
             if datafield.Tag = 10 then
                 controlNumber <- getSingleSubfield datafield "a"
                 // remove the space.
@@ -225,21 +187,23 @@ let addClassRecords theGraph (records : Marc21ClassRecord.Record seq) =
 // Maybe it will obviate TopLevel Graph
 // If I only use this and not the LCSH, have to make up my own IRIs.
 
-let buildGraph gzfile = 
-    let file = File.OpenRead(gzfile)
+let buildGraph filename outputGraphFileName = 
+    (* let file = File.OpenRead(gzfile)
     let instream = new StreamReader(new GZipStream(file, mode=CompressionMode.Decompress))
     let reader = XmlReader.Create(instream)
-    reader.MoveToContent() |> ignore // Can I avoid this or put it inside readRecords?
+    reader.MoveToContent() |> ignore // Can I avoid this or put it inside readRecords? *)
+    let reader = getXmlReader filename
     try 
         let startGraph = BuildTopLevel.buildGraph () // OR SubjectGraph.emptyGraph()
-        let theGraph = addClassRecords startGraph (readRecords reader)
+        let theGraph = addClassRecords startGraph (getRecordSeq reader)
         // SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
         // printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
         reader.Close()
-        instream.Close()
+        // instream.Close()
         // desperate attempt to reclaim memory before serialization.
-        npIndex.Clear()
-        System.GC.Collect()
+        // ...now not needed? I found a better pickler.
+        // npIndex.Clear()
+        // System.GC.Collect()
         saveGraph theGraph outputGraphFileName
         printfn "Class graph saved to %s" outputGraphFileName
     with 
