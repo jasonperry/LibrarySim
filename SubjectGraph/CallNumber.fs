@@ -74,13 +74,15 @@ module LCCN =
         cn.number = None
 
     let toString (cn : LCCN) = // might want to try monadic style with this too 
-        cn.letters + map_or "" cn.number string
-        + map_or "" cn.decimal (fun d -> (string d).[1..]) // no leading zero
-        + map_or "" cn.cutter1 (fun x -> 
-            "." + string (fst x) + map_or "" (snd x) (fun d -> (string d).[2..])) // no leading zero or dot
-        + map_or "" cn.cutter2 (fun x -> 
-            " " + string (fst x) + map_or "" (snd x) (fun d -> (string d).[2..])) // no zero or dot
-        + map_or "" cn.date string
+        cn.letters + mapOr string "" cn.number 
+        + mapOr (fun d -> (string d).[1..]) "" cn.decimal  // no leading zero
+        + mapOr (fun x -> 
+                    "." + string (fst x) + mapOr (fun d -> (string d).[2..]) "" (snd x) )
+                "" cn.cutter1 // no leading zero or dot
+        + mapOr (fun x -> 
+                    " " + string (fst x) + mapOr (fun d -> (string d).[2..]) "" (snd x) ) // no zero or dot
+                "" cn.cutter2
+        + mapOr string "" cn.date 
 
     let parse (cnString : string) = 
         let m = Regex.Match(cnString, LCCN_REGEX)  // Removed ToUpper; fixes should be before.
