@@ -45,6 +45,9 @@ module SubjectNode =
         name.Replace(" -- ", "--").Replace("--","@").Split([|'@'|])
         |> Array.filter (fun s -> s <> "")
         |> List.ofArray
+    let toSubjectInfo node = 
+        {uri = Some node.uri; cnRange = node.callNumRange; 
+         name = node.name; itemsUnder = node.booksUnder}
 
 /// A class with methods for finding subjects by prefix. Not currently used in LCCN-based graph.
 type NamePrefixIndex = private {
@@ -502,11 +505,8 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
             node.booksUnder <- node.booksUnder + 1
             Seq.iter updateCounts node.broader
         updateCounts parentNode
-        BookRecord.updateSubject item {
-            name = parentNode.name; 
-            cnRange = parentNode.callNumRange;
-            uri = Some parentNode.uri
-        } |> Some
+        BookRecord.updateSubject item (SubjectNode.toSubjectInfo parentNode) 
+        |> Some
 
 /// Add a book's subjects to a graph (and the book too if selected)
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
@@ -519,8 +519,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
     if addBook then
         // Add URIs for the found subjects to the book record.
         let updatedBook = 
-            (List.map (fun (nd: SubjectNode) -> 
-                {name = nd.name; cnRange = nd.callNumRange; uri = Some nd.uri}) nodes)
+            (List.map SubjectNode.toSubjectInfo nodes)
             |> List.fold BookRecord.updateSubject book 
         // update the booksUnder count upward.
         let rec updateCounts node = 

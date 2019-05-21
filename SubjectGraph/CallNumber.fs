@@ -82,7 +82,7 @@ module LCCN =
         + mapOr (fun x -> 
                     " " + string (fst x) + mapOr (fun d -> (string d).[2..]) "" (snd x) ) // no zero or dot
                 "" cn.cutter2
-        + mapOr string "" cn.date 
+        + mapOr (fun d -> " " + string d) "" cn.date
 
     let parse (cnString : string) = 
         let m = Regex.Match(cnString, LCCN_REGEX)  // Removed ToUpper; fixes should be before.
@@ -156,7 +156,7 @@ module LCCN =
                     && (snd (cn1.cutter1.Value)).IsSome && (snd (cn2.cutter1.Value)).IsNone
                     && cn2.cutter2.IsNone // Probably can't have a 2nd cutter without the first?
                     || cn1.cutter1.Value = cn2.cutter1.Value // whole thing
-                    && (cn1.cutter2.IsSome && cn1.cutter2.IsNone
+                    && (cn1.cutter2.IsSome && cn2.cutter2.IsNone
                         || cn1.cutter2.IsSome && cn2.cutter2.IsSome 
                         && fst (cn1.cutter2.Value) = fst (cn2.cutter2.Value)
                         && (snd (cn1.cutter2.Value)).IsSome && (snd(cn2.cutter2.Value)).IsNone)))))
@@ -312,6 +312,9 @@ module CNRange = // nice if it could be a functor over types of CNs...
         //|| LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
 
     let isSubRange subrange range = 
+        (*if subrange.startCN = subrange.endCN 
+        then contains range subrange.startCN
+        else range.startCN <= subrange.startCN && subrange.endCN <= range.endCN *)
         contains range subrange.startCN && contains range subrange.endCN
     /// Comparison function used to sort output.
     let compare ropt1 ropt2 = 

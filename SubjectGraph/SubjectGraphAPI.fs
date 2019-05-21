@@ -26,24 +26,25 @@ type SubjectsResult = {
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
   cnRange : string;
-  booksUnder : int // TODO: the actual books (or go back to the graph?)
 }
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
-    thisSubject = {uri = Some node.uri; cnRange = node.callNumRange; name = node.name};
+    thisSubject = {
+        uri = Some node.uri; 
+        cnRange = node.callNumRange; 
+        name = node.name;
+        itemsUnder = node.booksUnder
+    };
     broader = node.broader 
-      |> Seq.map (fun nd -> 
-          {uri = Some nd.uri; cnRange = nd.callNumRange; name = nd.name})
+      |> Seq.map SubjectNode.toSubjectInfo
       |> List.ofSeq;
       // Q: Is there a way to cast this to not convert the whole list? I've tried...
     narrower = node.narrower 
-      |> Seq.map (fun nd -> 
-          {uri = Some nd.uri; cnRange = nd.callNumRange; name = nd.name})
+      |> Seq.map SubjectNode.toSubjectInfo
       |> List.ofSeq
       |> List.sortWith (fun (si1: SubjectInfo) si2 -> 
                             CNRange.compare si1.cnRange si2.cnRange)
     cnRange = node.cnString |? ""
-    booksUnder = node.booksUnder
   }
 
   let toHtml (sr : SubjectsResult) = 
@@ -51,7 +52,8 @@ module SubjectsResult =
           // TODO: find a way to get the app's own URL...from the config?
           "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
           + "<td><a href=\"http://127.0.0.1:8080/browse?uri=" 
-          + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) + "</a></td>"
+          + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) 
+          + " (" + string si.itemsUnder + ") </a></td>"
       (if List.isEmpty sr.broader then 
           "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/classif/00top\">Top level</a></p>" 
        else
@@ -60,7 +62,7 @@ module SubjectsResult =
           + "</td></tr></table>")
       + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
       + "<p>Call number range: " + sr.cnRange + "<br />"
-      + "Entries under this heading: " + (string sr.booksUnder) + "</p>"
+      + "Entries under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       + "<table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
       + "</tr><table>"
@@ -99,17 +101,20 @@ type BooksResult = {
 module BooksResult = 
 
   let ofNode (node : SubjectNode) = {
-    thisSubject = {uri = Some node.uri; cnRange = node.callNumRange; name = node.name};
+    thisSubject = SubjectNode.toSubjectInfo node
     books = List.ofSeq node.books
   }
 
   let toHtml (bres : BooksResult) = 
     let bookfmt (br : BookRecord) = 
-        "<td><b>" + HttpUtility.HtmlEncode(br.Title) + "</b></td>"
+        "<td>" + (mapOr LCCN.toString "" br.LCCallNum) + "</td>"
+        + "<td><b>" + HttpUtility.HtmlEncode(br.Title) + "</b></td>"
         + "<td>" + HttpUtility.HtmlEncode(br.Authors) + "</td>"
+        + "</tr><tr><td></td>"
         + match br.Link with 
           | Some link -> "<td><a href=\"" + link + "\">" + link + "</a></td>"
-          | None -> "(no link)"
+          | None -> "<td>(no link)</td>"
+        + "</tr>"
     "<div class=\"booklisting\"><table><tr>"
     + (String.concat "</tr><tr>" (List.map bookfmt bres.books))
     + "</tr></table></div>"
@@ -117,13 +122,14 @@ module BooksResult =
 let getBookResult (g: SubjectGraph) q = 
   Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
   |> fun uriStr -> 
-         if uriStr = "top" then 
+         if uriStr = "top" then // Do I not even use this, just URL 00top
            {
                // FIXME: The cnRange setting is a hack, should it be better?
                thisSubject = {
                  uri = None; 
                  cnRange = Some (CNRange.parse "A-ZZ"); 
-                 name = "Top Level"
+                 name = "Top Level";
+                 itemsUnder = g.topNode.booksUnder
                };
                books = []
            }
@@ -168,7 +174,10 @@ let main argv =
   | "addBooksToClassGraph" -> 
       let graph = loadGraph argv.[1]
       addBooksToClassGraph graph argv.[2]
-      saveGraph graph "output/BooksAndClassGraph.sgb"
+      if argv.Length > 3 then 
+        saveGraph graph argv.[3]
+      else
+        saveGraph graph "output/BooksAndClassGraph.sgb"
       0
   | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]

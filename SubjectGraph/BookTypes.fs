@@ -9,7 +9,8 @@ open CallNumber
 type SubjectInfo = {
   uri : System.Uri option;
   cnRange : LCCNRange option;
-  name : string
+  name : string;
+  itemsUnder : int;
 }
 
 /// Primary type for information about a single catalog item.
@@ -30,6 +31,7 @@ module BookRecord =
             match infolist with
                 | [] -> [sinfo]
                 | info :: rest -> 
+                    // Find the matching subject by name.
                     if sinfo.name = info.name then
                         sinfo :: rest
                     else 
