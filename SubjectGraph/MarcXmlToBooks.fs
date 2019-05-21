@@ -17,6 +17,7 @@ open System.Xml
 open FSharp.Data
 open System.Runtime.Serialization.Formatters.Binary
 
+open Common
 open MarcXml
 open BookTypes
 open CallNumber
@@ -92,12 +93,14 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
                                     .Replace(" -- ", "--")
                 // printfn "Subject (%d): %s" datafield.Tag subjName
                 subjects.Add(
-                    // No call number known for the subject yet, may be replaced.
-                    { name = subjName; cnRange = None; uri = None})
+                    // I feel a little bit of a mismatch here. SubjectInfo seems really
+                    // for the HTTP API, not for keeping with books.
+                    { name = subjName; cnRange = None; uri = None; itemsUnder = 0})
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
             elif datafield.Tag = 50 then
-                let cn = (getSingleSubfield datafield "a").Value
+                let (sfa, sfb) = (getSingleSubfield datafield "a", getSingleSubfield datafield "b")
+                let cn = sfa.Value + (sfb |? "")
                 printfn "Call Number: %s" cn
                 try 
                     lcCallNum <- Some (LCCN.parse cn)
@@ -108,7 +111,7 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
                         if LCCN.isCNLetters cn then 
                             lcLetters <- Some cn
                         else printfn "(!!) %s" errorstr
-                withCallNum <- withCallNum + 1
+                withCallNum <- withCallNum + 1 // even if error...
             elif datafield.Tag = 82 then
                 let dcn = getSingleSubfield datafield "a"
                 printfn "Dewey Call number: %s" dcn.Value
@@ -119,6 +122,9 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
         totalRecords <- totalRecords + 1
         if subjects.Count > 0 then
             withSubjects <- withSubjects + 1
+        // Criterion for adding a book: currently that it has a parsed 
+        // call number.
+        if Option.isSome lcCallNum then
             books.Add({
                         Title = title.Value + 
                                 if subtitle.IsSome then (" " + subtitle.Value) else "";
