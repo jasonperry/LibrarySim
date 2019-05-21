@@ -142,9 +142,12 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
             Logger.Error <| "No call number entry (153) or string for record " + controlNumber.Value
-        elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Table for") then
+        elif subjectNames.Count > 0 && 
+            (subjectNames.[0].StartsWith("Table for") 
+             || subjectNames.[0].StartsWith("Table of")
+             || subjectNames.[0].StartsWith("Tables of")) then
             // TODO: just try to parse the CN here, and skip if it fails.
-            Logger.Info <| "Skipping 'table for' entry " + (controlNumber |? "")
+            Logger.Info <| "Skipping table entry " + (controlNumber |? "")
         elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then
             Logger.Info <| "Skipping 'Learned societies' table for entry " + (controlNumber |? "")
         else 
