@@ -46,14 +46,24 @@ module SubjectsResult =
                             CNRange.compare si1.cnRange si2.cnRange)
     cnRange = node.cnString |? ""
   }
+  let nodeListToInfoList nodes = 
+      List.map 
+          (fun nd -> {
+               uri = Some nd.uri;
+               cnRange = nd.callNumRange;
+               name = nd.name;
+               itemsUnder = nd.booksUnder
+           })
+          nodes
+
+  let formatSubjectInfo (si : SubjectInfo) = 
+      // TODO: find a way to get the app's own URL...from the config?
+      "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
+      + "<td><a href=\"http://127.0.0.1:8080/browse?uri=" 
+      + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) 
+      + " (" + string si.itemsUnder + ") </a></td>"
 
   let toHtml (sr : SubjectsResult) = 
-      let formatSubjectInfo (si : SubjectInfo) = 
-          // TODO: find a way to get the app's own URL...from the config?
-          "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
-          + "<td><a href=\"http://127.0.0.1:8080/browse?uri=" 
-          + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) 
-          + " (" + string si.itemsUnder + ") </a></td>"
       (if List.isEmpty sr.broader then 
           "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/classif/00top\">Top level</a></p>" 
        else
@@ -66,6 +76,13 @@ module SubjectsResult =
       + "<table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
       + "</tr><table>"
+
+  let infoListToHtml (infolist : SubjectInfo list) =
+      "<p>Back to top (somehow)</p>"
+      + "<p>Number of results: " + string (infolist.Length) + "</p>"
+      + "<table><tr>"
+      + String.concat "</tr><tr>" (List.map formatSubjectInfo infolist)
+      + "</tr></table>"
 
   /// Construct a result object corresponding to the top level. Now we have a top node
   (* let topLevel (g : SubjectGraph) = 
@@ -90,6 +107,13 @@ let getSubjectResult g q =
     else *)
       // TODO: error handling
       SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
+
+let getSubjectSearchResult (g : SubjectGraph) q = 
+    Option.ofChoice (q ^^ "searchstr") |? "Unrecognized variable"
+    |> fun searchStr -> 
+          // TODO: don't just start from top node, receive current URI from request.
+          SubjectGraph.search g g.topNode.uri searchStr
+          |> SubjectsResult.nodeListToInfoList
 
 /// Transmission type of all books under a SubjectNode.
 type BooksResult = {
@@ -155,7 +179,14 @@ let dispatch g =
                                    + SubjectsResult.toHtml (getSubjectResult g r.query)
                                    + "<hr>"
                                    + BooksResult.toHtml (getBookResult g r.query)
-                                   + "</body></html>")) ]
+                                   + "</body></html>")) 
+          path "/searchsubj"
+          >=> setMimeType "text/html; charset=utf-8"
+          >=> request (fun r -> Successful.OK
+                                  ("<html><body><h1>Search result:</h1>"
+                                   + SubjectsResult.infoListToHtml (getSubjectSearchResult g r.query)
+                                   + "</body></html>"))
+        ]
       POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
           path "/goodbye" >=> Successful.OK "Good bye POST" ] ]

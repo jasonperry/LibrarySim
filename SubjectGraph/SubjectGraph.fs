@@ -10,6 +10,7 @@ open CallNumber
 open SparqlQuery
 
 /// Where to put this? Either in common or NamePrefixIndex.
+/// Return true if list1 is a strict prefix of list2 (not equal).
 let rec isStrictPrefix list1 list2 = 
     match (list1, list2) with
         | (_, []) -> false
@@ -143,6 +144,8 @@ type NamePrefixIndex = private {
     /// a solution as a new type or custom serialization.)
     member this.Clear () = this.theMap.Clear()
 
+(* End class NamePrefixdex **************************************************)
+
 /// Search algorithm for CN Index. Hopefully obsolete, all tree-based now.
 (* module CNIndex = 
     let rec mostSpecificMatch (cnIndex: Dictionary<LCCNRange, SubjectNode list>) (cn: LCCNRange) = 
@@ -223,6 +226,17 @@ module SubjectGraph =
             | Some node -> searchParent node 
             | None -> atnode
         searchParent graph.topNode
+
+    /// Search subject names for a string under a given starting node, 
+    /// returning list of only topmost nodes that match.
+    let search graph startURI (searchStr : string) = 
+        let searchStr = searchStr.ToLower()
+        let rec search' fromnode = 
+            if fromnode.name.ToLower().Contains searchStr then [fromnode]
+            else 
+                Seq.map search' fromnode.narrower
+                |> Seq.concat |> Seq.toList
+        search' graph.uriIndex.[startURI] // need exception handling? here?
 
     /// Totally awesome, perfect, clear, generic node insertion function.
     /// Dependency injection! an isChild comparison function: CNRange.isSubRange
@@ -355,9 +369,8 @@ module SubjectGraph =
             if node.broader.Count = 0 then
                 graph.topLevel.Add(node) *)
 
-/// Return true if list1 is a strict prefix of list2 (not equal).
 
-(* ***************************************************************** *)
+(* end module SubjectGraph ************************************************ *)
 
 /// Return true if 1st URI is higher in the graph than the 2nd.
 let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 

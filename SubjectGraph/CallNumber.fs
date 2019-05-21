@@ -147,9 +147,11 @@ module LCCN =
     let moreSpecific cn1 cn2 = 
         cn1.letters = cn2.letters
         && (cn1.number.IsSome && cn2.number.IsNone // any cases where number is none & rest isn't?
-            || cn1.number = cn2.number 
+            // new simplified version.
+            || cn1.number = cn2.number && cn1.decimal = cn2.decimal
+            (*|| cn1.number = cn2.number 
             && (cn1.decimal.IsSome && cn2.decimal.IsNone && cn2.cutter1.IsNone
-                || cn1.decimal = cn2.decimal 
+                || cn1.decimal = cn2.decimal  *)
                 && (cn1.cutter1.IsSome && cn2.cutter1.IsNone && cn2.cutter2.IsNone
                     || cn1.cutter1.IsSome && cn2.cutter1.IsSome 
                     && (fst (cn1.cutter1.Value) = fst (cn2.cutter1.Value)
@@ -159,7 +161,7 @@ module LCCN =
                     && (cn1.cutter2.IsSome && cn2.cutter2.IsNone
                         || cn1.cutter2.IsSome && cn2.cutter2.IsSome 
                         && fst (cn1.cutter2.Value) = fst (cn2.cutter2.Value)
-                        && (snd (cn1.cutter2.Value)).IsSome && (snd(cn2.cutter2.Value)).IsNone)))))
+                        && (snd (cn1.cutter2.Value)).IsSome && (snd(cn2.cutter2.Value)).IsNone))))
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 
         cn1.letters <= cn2.letters 
