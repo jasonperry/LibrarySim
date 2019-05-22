@@ -15,8 +15,9 @@ open CallNumber
 open SubjectGraph
 open MarcXmlToBooks
 
-// TODO: put these in a configuration file.
+// TODO: put these in a configuration file, or get them from the app instance.
 let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
+let appRoot = "http://" + listenIPs.[0] + ":8080/"
 
 /// Immutable SubjectNode info returned by the API, to be directly JSONized 
 ///   and sent to the browser.
@@ -59,18 +60,17 @@ module SubjectsResult =
   let formatSubjectInfo (si : SubjectInfo) = 
       // TODO: find a way to get the app's own URL...from the config?
       "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
-      + "<td><a href=\"http://127.0.0.1:8080/browse?uri=" 
+      + "<td><a href=\"" + appRoot + "browse?uri=" 
       + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) 
       + " (" + string si.itemsUnder + ") </a></td>"
 
   let toHtml (sr : SubjectsResult) = 
-      (if List.isEmpty sr.broader then 
-          "<p>Up: <a href=\"http://127.0.0.1:8080/browse?uri=http://knowledgeincoding.net/classif/00top\">Top level</a></p>" 
+      (if List.isEmpty sr.broader then ""
        else
           "<table><tr><td>Up: </td>" 
           + (String.concat "</td><td>" (List.map formatSubjectInfo sr.broader))
           + "</td></tr></table>")
-      + "<h1>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h1>"  
+      + "<h2>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
       + "<p>Call number range: " + sr.cnRange + "<br />"
       + "Entries under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       + "<table><tr>"
@@ -78,8 +78,7 @@ module SubjectsResult =
       + "</tr><table>"
 
   let infoListToHtml (infolist : SubjectInfo list) =
-      "<p>Back to top (somehow)</p>"
-      + "<p>Number of results: " + string (infolist.Length) + "</p>"
+      "<p>Found " + string (infolist.Length) + " results.</p>"
       + "<table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo infolist)
       + "</tr></table>"
@@ -109,11 +108,22 @@ let getSubjectResult g q =
       SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
 
 let getSubjectSearchResult (g : SubjectGraph) q = 
-    Option.ofChoice (q ^^ "searchstr") |? "Unrecognized variable"
-    |> fun searchStr -> 
-          // TODO: don't just start from top node, receive current URI from request.
-          SubjectGraph.search g g.topNode.uri searchStr
-          |> SubjectsResult.nodeListToInfoList
+    // printf "Doing search..."
+    match Option.ofChoice (q ^^ "searchstr") with
+    | Some searchStr -> 
+        let startUri = 
+            match Option.ofChoice (q ^^ "fromtop") with
+            | Some "false" -> 
+                // printf "Got false choice option!";
+                match Option.ofChoice (q ^^ "uri") with
+                | Some uri -> System.Uri uri
+                | None -> g.topNode.uri
+            | None | Some _ -> g.topNode.uri
+        SubjectGraph.search g startUri searchStr
+        |> SubjectsResult.nodeListToInfoList
+    | None -> []
+
+  
 
 /// Transmission type of all books under a SubjectNode.
 type BooksResult = {
@@ -160,6 +170,28 @@ let getBookResult (g: SubjectGraph) q =
          else 
              BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
 
+let pageHeader (r: HttpRequest) = 
+    let (locationStr, atNode) = 
+        match Option.ofChoice (r.queryParam "uri") with
+        | Some lstr -> (lstr, true)
+        | None -> match Option.ofChoice (r.queryParam "searchstr") with
+                  | Some sstr -> (sstr, false)
+                  | None -> ("Where am I?", false)
+    "<html><head><title>SubjectGraph Browser</title><head>" 
+    + "<body><table><tr><td width=60%><h1>SubjectGraph</h1></td>"
+    + "<td width=40%>"
+    + "<form method=GET action=searchsubj>"
+    + "<input type=TEXT name=searchstr>Search</input>"
+    + "<input type=SUBMIT name=submit value=Go><br/>"
+    + if atNode then (
+        "<input type=RADIO name=fromtop value=true checked=yes> From top level"
+        + "<input type=RADIO name=fromtop value=false> From current node"
+        + "<input type=HIDDEN name=uri value=" + locationStr + ">" )
+      else "<input type=HIDDEN name=fromtop value=true>"
+    + "</form></td></tr>"
+    // + "<tr><td>" + locationStr + "</td></tr>"
+    + "</table><hr>"
+
 let dispatch g =
   choose 
     [ GET >=> choose
@@ -175,7 +207,7 @@ let dispatch g =
           path "/browse" // JSON client will get subject and books in ajaxy way?
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> Successful.OK 
-                                  ("<html><body>"
+                                  (pageHeader r 
                                    + SubjectsResult.toHtml (getSubjectResult g r.query)
                                    + "<hr>"
                                    + BooksResult.toHtml (getBookResult g r.query)
@@ -183,7 +215,15 @@ let dispatch g =
           path "/searchsubj"
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> Successful.OK
-                                  ("<html><body><h1>Search result:</h1>"
+                                  (pageHeader r
+                                   + "<p><a href=\"" + appRoot + "browse?uri=" 
+                                   + string (g.topNode.uri) + "\">Back to top</a></p>"
+                                   + "<h2>Search result for: " 
+                                   // Maybe I should deal with all the variables here, so the
+                                   // getSubjectSearchResult function can be cleaner.
+                                   + (Option.ofChoice (r.queryParam "searchstr") |? ":empty:")
+                                   // TODO: show the name of the node it's under. Need to return more search info?
+                                   //+ " under: " + (Option.ofChoice (r.queryParam "uri") |? "(top)") + "</h2>"
                                    + SubjectsResult.infoListToHtml (getSubjectSearchResult g r.query)
                                    + "</body></html>"))
         ]
