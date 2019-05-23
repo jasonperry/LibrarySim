@@ -285,24 +285,44 @@ module SubjectGraph =
 
     // mapSubTree function: apply a function recursively to the subtree starting at a node.
 
-    // Remove all subtress with zero elements
+    // Remove all subtrees with zero elements
     let cullGraph graph =
-        let mutable removed = 0 // Ideally, would fold this in the result...
+        let mutable numRemoved = 0 // Ideally, would fold this in the result...
         let rec cull' node = 
             // let toRemove = Seq.filter (fun cn -> cn.booksUnder = 0) node.narrower
             // Seq.iter (fun cn -> node.narrower.Remove(cn) |> ignore) toRemove
             // removed <- removed + Seq.length toRemove
-            removed <- removed + node.narrower.RemoveAll(fun cn -> cn.booksUnder = 0)
+            numRemoved <- numRemoved + node.narrower.RemoveAll(fun cn -> cn.booksUnder = 0)
             Seq.iter cull' node.narrower
         cull' graph.topNode
-        removed
-    /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
+        numRemoved
+    
+    /// If a subtree has a small number of books, pull them all up into the root
+    let collapseGraph graph thresh = 
+        let rec harvestItems nodelist = 
+            Seq.concat 
+                (Seq.map 
+                    (fun nd -> Seq.append nd.books (harvestItems nd.narrower)) 
+                    nodelist)
+            // Seq.fold (fun l nd -> 
+            //             l @ (List.ofSeq nd.books)
+            //             @ (Seq.concat harvestItems [] nd.narrower)
+            //          ) 
+            //          [] nodelist
+        let rec collapse' node = 
+            if node.booksUnder < thresh then
+                node.books.AddRange(harvestItems node.narrower)
+                node.narrower.Clear()
+            else
+                Seq.iter collapse' node.narrower
+        collapse' graph.topNode
+
+        /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
     (* let makeTopLevel graph = 
         for node in graph.uriIndex.Values do
             if node.broader.Count = 0 then
                 graph.topLevel.Add(node) *)
-
 
 (* end module SubjectGraph ************************************************ *)
 

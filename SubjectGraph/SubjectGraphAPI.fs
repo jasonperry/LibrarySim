@@ -259,6 +259,23 @@ let main argv =
         printfn "Removed %d nodes from graph, saving..." removed
         saveGraph graph "output/CulledGraph.sgb"
         0
+  | "collapseGraph" ->
+        let graph = loadGraph argv.[1]
+        let outGraphName = "output/CollapsedGraph.sgb"
+        printfn "Loaded graph %s" argv.[1]
+        SubjectGraph.collapseGraph graph (int argv.[2])
+        printfn "Saving culled graph %s" outGraphName
+        saveGraph graph outGraphName
+        0
+  | "cullapseGraph" ->
+      let graph = loadGraph argv.[1]
+      let outGraphName = "output/CullapsedGraph.sgb"
+      printfn "Loaded graph %s" argv.[1]
+      SubjectGraph.collapseGraph graph (int argv.[2])
+      let removed = SubjectGraph.cullGraph graph
+      printfn "Removed %d nodes; saving collapsed/culled graph %s" removed outGraphName
+      saveGraph graph outGraphName
+      0
 
   | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]
