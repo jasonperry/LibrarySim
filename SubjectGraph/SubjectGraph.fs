@@ -176,8 +176,8 @@ module SubjectGraph =
         // TODO: parameterize by catalog type. LOC only for now.
         let topNode = {
             uri = Uri "http://knowledgeincoding.net/classif/00top";
-            name = "Top Subject"; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
-            subdividedName = ["Top Subject"];
+            name = "Top Level"; // TODO: add variant names to subjectNameIndex. OK to keep this as canonical-only?
+            subdividedName = ["Top Level"];
             callNumRange = Some {startCN = LCCN.lettersOnlyCN "A"; 
                                  endCN = LCCN.lettersOnlyCN "ZZ"};
             cnString = Some "A-ZZ"; // just as a backup
@@ -283,85 +283,19 @@ module SubjectGraph =
                 else graph.cnIndex.Add (cn, [newNode])
             | None -> ()
 
-    /// OBSOLETE. Take a completed subject entry and update the graph structure, based on name segments
-    let insertNodeBySubjectSegments graph (newNode: SubjectNode) = 
-        // TODO? Check if already in index, since this function is doing the work now?
-        // Remove links that this node will go between.
-        // *debug*
-        (* printfn "%A" (Seq.map (fun nd -> nd.name) newNode.broader)
-        printfn "%s" newNode.name
-        printfn "%A" (Seq.map (fun nd -> nd.name) newNode.narrower)
-        printfn "-------------" *)
-        // Attempt to find the best parent node(s).
-        let parents = 
-            // First, look for a shorter version of a complex subject
-            let prefixParents = findLongestPrefixSubj graph newNode.subdividedName
-            if not (List.isEmpty prefixParents) then
-                prefixParents
-            (* elif callLetters.IsSome && graph.cnIndex.ContainsKey callLetters.Value then
-                // TODO: find "narrowest call range above"...
-                graph.cnIndex.[callLetters.Value] *)
-            // old code to use LCSH broader for parents if no call number subject found
-            (* elif (not qres.results.IsEmpty) then
-                let broaderSubjects = getBroaderTerms uri
-                // ISSUE: these might be broader than our top-level. 
-                // ISSUE: Need to check/update call number.
-                List.map (fun br -> addSubjectByCN graph (snd br) callLetters) broaderSubjects 
-                    |> List.choose id  // filters out empties.
-                // still recursively add? Yes, but it should stop now!!
-                //  what if it has a call number?  *)
-            else []  // No more warning...parents can be found later
-                // or still might want to return None for now, to see how I'm doing.
-        // Get list of node's children. If there are no single-extension 
-        // subjects, take them all and later they'll get "wedged between"
-        let children = 
-            // TODO: correct is to only add extensions with "nothing between"
-            graph.subjectPrefixIndex.FindChildren newNode.subdividedName
-            (*match graph.subjectPrefixIndex.SingleExtensions subdividedName with
-                | [] -> graph.subjectPrefixIndex.AllExtensions subdividedName
-                | extns -> extns *)
-        // Go ahead and add the parents and children
-        newNode.broader.AddRange(parents)
-        newNode.narrower.AddRange(children)
-        // Loop to remove links this node "goes between".
-        for parent in parents do
-            let removeFromParentNarrower = new List<SubjectNode>()
-            for child in parent.narrower do
-                // printfn "comparing %s *to*\n     %s" child.name newNode.name
-                if SubjectNode.isNarrower child newNode then
-                    // printfn "re-parenting child node %s" child.name
-                    // newNode.narrower.Add child  // should already be there
-                    removeFromParentNarrower.Add child
-                    child.broader.Remove parent |> ignore
-                    // child.broader.Add newNode // done below
-            Seq.iter (fun nd -> parent.narrower.Remove nd |> ignore) removeFromParentNarrower
-            // Is this enough? Do I have to think upward too?
-        // Add "backlinks"
-        for parent in newNode.broader do
-            parent.narrower.Add newNode
-        for child in newNode.narrower do 
-            child.broader.Add newNode
-        // Add key and value to subject name index. TODO: add variants.
-        if not (graph.subjectNameIndex.ContainsKey newNode.name) then
-            graph.subjectNameIndex.Add (newNode.name, [newNode])
-        else
-            // It's OK just to append because we won't call this on a node
-            // that's already in the graph.
-            graph.subjectNameIndex.[newNode.name] <- 
-                (newNode :: graph.subjectNameIndex.[newNode.name])
-        // 3. Add to the subject prefix index.
-        graph.subjectPrefixIndex.Add newNode
-        // 3. Add the new subject URI to that index.
-        graph.uriIndex.Add(newNode.uri, newNode)
-        // 4. If subject has a call number, add that to the index.
-        // NOT APPROPRIATE if it's just letters, but doing it anyway. They'll have long lists.
-        // Temp change 12/24: pulling out just letters from parsed CNRange.
-        match newNode.callNumRange with 
-            | Some cn -> 
-                if graph.cnIndex.ContainsKey cn then
-                    graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
-                else graph.cnIndex.Add (cn, [newNode])
-            | None -> ()
+    // mapSubTree function: apply a function recursively to the subtree starting at a node.
+
+    // Remove all subtress with zero elements
+    let cullGraph graph =
+        let mutable removed = 0 // Ideally, would fold this in the result...
+        let rec cull' node = 
+            // let toRemove = Seq.filter (fun cn -> cn.booksUnder = 0) node.narrower
+            // Seq.iter (fun cn -> node.narrower.Remove(cn) |> ignore) toRemove
+            // removed <- removed + Seq.length toRemove
+            removed <- removed + node.narrower.RemoveAll(fun cn -> cn.booksUnder = 0)
+            Seq.iter cull' node.narrower
+        cull' graph.topNode
+        removed
     /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
     (* let makeTopLevel graph = 

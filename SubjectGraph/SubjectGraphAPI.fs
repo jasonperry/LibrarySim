@@ -17,7 +17,8 @@ open MarcXmlToBooks
 
 // TODO: put these in a configuration file, or get them from the app instance.
 let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
-let appRoot = "http://" + listenIPs.[0] + ":8080/"
+let appPort = 8080
+let appRoot = "http://" + listenIPs.[0] + ":" + (string appPort) + "/"
 
 /// Immutable SubjectNode info returned by the API, to be directly JSONized 
 ///   and sent to the browser.
@@ -109,19 +110,19 @@ let getSubjectResult g q =
 
 let getSubjectSearchResult (g : SubjectGraph) q = 
     // printf "Doing search..."
-    match Option.ofChoice (q ^^ "searchstr") with
-    | Some searchStr -> 
+    match (q ^^ "searchstr") with
+    | Choice1Of2 searchStr -> 
         let startUri = 
-            match Option.ofChoice (q ^^ "fromtop") with
-            | Some "false" -> 
+            match (q ^^ "fromtop") with
+            | Choice1Of2 "false" -> 
                 // printf "Got false choice option!";
-                match Option.ofChoice (q ^^ "uri") with
-                | Some uri -> System.Uri uri
-                | None -> g.topNode.uri
-            | None | Some _ -> g.topNode.uri
+                match (q ^^ "uri") with
+                | Choice1Of2 uri -> System.Uri uri
+                | _ -> g.topNode.uri
+            | _ -> g.topNode.uri
         SubjectGraph.search g startUri searchStr
         |> SubjectsResult.nodeListToInfoList
-    | None -> []
+    | _ -> []
 
   
 
@@ -171,12 +172,14 @@ let getBookResult (g: SubjectGraph) q =
              BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
 
 let pageHeader (r: HttpRequest) = 
-    let (locationStr, atNode) = 
-        match Option.ofChoice (r.queryParam "uri") with
-        | Some lstr -> (lstr, true)
-        | None -> match Option.ofChoice (r.queryParam "searchstr") with
-                  | Some sstr -> (sstr, false)
-                  | None -> ("Where am I?", false)
+    let uriStr = 
+        match (r.queryParam "uri") with
+        | Choice1Of2 uri -> uri
+        | _ -> "SHOULDN'T HAPPEN"
+    let atNode = 
+        match (r.queryParam "searchstr") with
+        | Choice1Of2 sstr -> false
+        | _ -> true
     "<html><head><title>SubjectGraph Browser</title><head>" 
     + "<body><table><tr><td width=60%><h1>SubjectGraph</h1></td>"
     + "<td width=40%>"
@@ -186,7 +189,7 @@ let pageHeader (r: HttpRequest) =
     + if atNode then (
         "<input type=RADIO name=fromtop value=true checked=yes> From top level"
         + "<input type=RADIO name=fromtop value=false> From current node"
-        + "<input type=HIDDEN name=uri value=" + locationStr + ">" )
+        + "<input type=HIDDEN name=uri value=" + uriStr + ">" )
       else "<input type=HIDDEN name=fromtop value=true>"
     + "</form></td></tr>"
     // + "<tr><td>" + locationStr + "</td></tr>"
@@ -227,9 +230,9 @@ let dispatch g =
                                    + SubjectsResult.infoListToHtml (getSubjectSearchResult g r.query)
                                    + "</body></html>"))
         ]
-      POST >=> choose
+      (* POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
-          path "/goodbye" >=> Successful.OK "Good bye POST" ] ]
+          path "/goodbye" >=> Successful.OK "Good bye POST" ] *) ]
 
 // end module BooksResult
 
@@ -250,6 +253,13 @@ let main argv =
       else
         saveGraph graph "output/BooksAndClassGraph.sgb"
       0
+  | "cullGraph" ->
+        let graph = loadGraph argv.[1]
+        let removed = SubjectGraph.cullGraph graph
+        printfn "Removed %d nodes from graph, saving..." removed
+        saveGraph graph "output/CulledGraph.sgb"
+        0
+
   | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]
       0
@@ -267,7 +277,7 @@ let main argv =
       printfn "Loaded subject graph"
       startWebServer 
         { defaultConfig with 
-            bindings = List.map (fun ip -> HttpBinding.createSimple HTTP ip 8080) 
+            bindings = List.map (fun ip -> HttpBinding.createSimple HTTP ip appPort) 
                                 listenIPs 
         }
         (dispatch theGraph) //(Successful.OK "Hello, Suave!")
