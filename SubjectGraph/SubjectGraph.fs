@@ -299,16 +299,12 @@ module SubjectGraph =
     
     /// If a subtree has a small number of books, pull them all up into the root
     let collapseGraph graph thresh = 
+        // Return a list of all items below a list of nodes.
         let rec harvestItems nodelist = 
             Seq.concat 
                 (Seq.map 
                     (fun nd -> Seq.append nd.books (harvestItems nd.narrower)) 
                     nodelist)
-            // Seq.fold (fun l nd -> 
-            //             l @ (List.ofSeq nd.books)
-            //             @ (Seq.concat harvestItems [] nd.narrower)
-            //          ) 
-            //          [] nodelist
         let rec collapse' node = 
             if node.booksUnder < thresh then
                 node.books.AddRange(harvestItems node.narrower)
@@ -317,7 +313,28 @@ module SubjectGraph =
                 Seq.iter collapse' node.narrower
         collapse' graph.topNode
 
-        /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
+    /// Shorten long paths by eliminating nodes with one child and no books.
+    let contractGraph graph = 
+        let rec contract' node depth = 
+            if node.narrower.Count = 1 && node.books.Count = 0
+            then
+                let child = node.narrower.[0]
+                printfn "Removing node (%s) with child (%s) at depth %d" 
+                        node.name child.name depth
+                for parent in node.broader do 
+                    parent.narrower.Remove(node) |> ignore
+                    parent.narrower.Add(child)
+                child.broader.Remove(node) |> ignore
+                child.broader.AddRange(node.broader)
+                contract' child (depth+1)
+            else
+                // Okay to recurse on a copy, because nodes *at this level*
+                //  will never be deleted. Right?
+                let narrowerCopy = new List<_>(node.narrower) // so iteration won't fail.
+                Seq.iter (fun nd -> contract' nd (depth+1)) narrowerCopy
+        contract' graph.topNode 0
+
+    /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
     (* let makeTopLevel graph = 
         for node in graph.uriIndex.Values do

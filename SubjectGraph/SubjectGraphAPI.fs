@@ -276,7 +276,13 @@ let main argv =
       printfn "Removed %d nodes; saving collapsed/culled graph %s" removed outGraphName
       saveGraph graph outGraphName
       0
-
+  | "contractGraph" ->
+      let graph = loadGraph argv.[1]
+      let outGraphName = "output/ContractedGraph.sgb"
+      SubjectGraph.contractGraph graph
+      printfn "Saving contracted graph %s" outGraphName
+      saveGraph graph outGraphName
+      0
   | "buildGutenBooks" ->
       MarcXmlToBooks.processBooks argv.[1]
       0
