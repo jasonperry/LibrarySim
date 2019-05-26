@@ -146,7 +146,11 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         elif subjectNames.Count > 0 && 
             (subjectNames.[0].StartsWith("Table for") 
              || subjectNames.[0].StartsWith("Table of")
-             || subjectNames.[0].StartsWith("Tables of")) then
+             || subjectNames.[0].StartsWith("Tables of")
+             || subjectNames.[0].StartsWith("Table 1 of")
+             || subjectNames.[0].StartsWith("Table 2 of")
+             || subjectNames.[0].StartsWith("Table 3 of")
+             || subjectNames.[0].StartsWith("Societies table")) then
             // TODO: just try to parse the CN here, and skip if it fails.
             Logger.Info <| "Skipping table entry " + (controlNumber |? "")
         elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then

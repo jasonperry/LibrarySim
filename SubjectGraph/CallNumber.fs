@@ -307,17 +307,20 @@ module CNRange = // nice if it could be a functor over types of CNs...
                 printfn "Warning: Start of CN range %s isn't <= %s: swapping" startCNStr endCNStr
                 {startCN = endCNParsed; endCN = startCNParsed}
             
-    let contains range cn =       // range.contains cn
+    let contains range cn =
         range.startCN <= cn && cn <= range.endCN
         // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
-        || range.startCN <= cn && range.startCN <> range.endCN && LCCN.moreSpecific cn range.endCN
-        //|| LCCN.isLettersOnly range.endCN && cn.letters = range.endCN.letters
+        || range.startCN <= cn && LCCN.moreSpecific cn range.endCN
 
     let isSubRange subrange range = 
-        (*if subrange.startCN = subrange.endCN 
-        then contains range subrange.startCN
-        else range.startCN <= subrange.startCN && subrange.endCN <= range.endCN *)
-        contains range subrange.startCN && contains range subrange.endCN
+        // Update to not use contains, but its own logic.
+        range.startCN <= subrange.startCN && 
+            (subrange.endCN <= range.endCN 
+             // heuristic: only allow the moreSpecific case if 
+             // 1) it's not a single-CN range,  2) they don't have the same start.
+             || range.startCN <> range.endCN && range.startCN <> subrange.startCN
+                && LCCN.moreSpecific subrange.endCN range.endCN)
+
     /// Comparison function used to sort output.
     let compare ropt1 ropt2 = 
         match ropt1 with 
