@@ -73,7 +73,7 @@ module SubjectsResult =
           + "</td></tr></table>")
       + "<h2>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
       + "<p>Call number range: " + sr.cnRange + "<br />"
-      + "Entries under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
+      + "Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       + "<table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
       + "</tr><table>"
@@ -281,6 +281,16 @@ let main argv =
       let outGraphName = "output/ContractedGraph.sgb"
       SubjectGraph.contractGraph graph
       printfn "Saving contracted graph %s" outGraphName
+      saveGraph graph outGraphName
+      0
+  | "minimizeGraph" -> // do all the things.
+      let graph = loadGraph argv.[1]
+      let outGraphName = "output/MinimizedGraph.sgb"
+      printfn "Loaded graph %s" argv.[1]
+      SubjectGraph.collapseGraph graph (int argv.[2])
+      let removed = SubjectGraph.cullGraph graph
+      SubjectGraph.contractGraph graph // TODO : removed 2, add them together.
+      printfn "Removed %d nodes; saving minimized graph %s" removed outGraphName
       saveGraph graph outGraphName
       0
   | "buildGutenBooks" ->

@@ -489,6 +489,7 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
             node.booksUnder <- node.booksUnder + 1
             Seq.iter updateCounts node.broader
         updateCounts parentNode
+        printfn "...added under %s" parentNode.name
         BookRecord.updateSubject item (SubjectNode.toSubjectInfo parentNode) 
         |> Some
 

@@ -75,14 +75,14 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
                 | None -> () // TODO: make up one if it's not there (not here, below)
             if datafield.Tag = 245 then
-                printfn "Title Statement found: "
+                // "Title Statement found: "
                 title <- getSingleSubfield datafield "a"
                 subtitle <- getSingleSubfield datafield "b"
-                printfn ": %A - %A" title subtitle
+                //printfn ": %A - %A" title subtitle
             elif datafield.Tag = 100 then
-                printf "Primary Author found: " // TODO: dig out more authors
+                //printf "Primary Author found: " // TODO: dig out more authors
                 authors <- getSingleSubfield datafield "a"
-                printfn ": %A" authors
+                //printfn ": %A" authors
             // 150 is the topic heading for Marc21 Full. 
             // The gutenberg converter uses 653.
             elif (datafield.Tag = 650 || datafield.Tag = 653)
@@ -101,20 +101,24 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
             elif datafield.Tag = 50 then
                 let (sfa, sfb) = (getSingleSubfield datafield "a", getSingleSubfield datafield "b")
                 let cn = sfa.Value + (sfb |? "")
-                printfn "Call Number: %s" cn
+                //printfn "Call Number: %s" cn
                 try 
-                    lcCallNum <- Some (LCCN.parse cn)
-                    lcLetters <- Some (lcCallNum.Value.letters)
+                    if cn.StartsWith "YA " then
+                        // Actually, only skips if we skip adding books with no CN below.
+                        printfn "Skipping special collection item %s" cn
+                    else 
+                        lcCallNum <- Some (LCCN.parse cn)
+                        lcLetters <- Some (lcCallNum.Value.letters)
+                        withCallNum <- withCallNum + 1
                 with 
                     // If the call number is letters (gutenberg), detect and store.
                     | CallNumberError errorstr -> 
                         if LCCN.isCNLetters cn then 
                             lcLetters <- Some cn
                         else printfn "(!!) %s" errorstr
-                withCallNum <- withCallNum + 1 // even if error...
             elif datafield.Tag = 82 then
                 let dcn = getSingleSubfield datafield "a"
-                printfn "Dewey Call number: %s" dcn.Value
+                //printfn "Dewey Call number: %s" dcn.Value
                 withDeweyNum <- withDeweyNum + 1
             elif datafield.Tag = 856 then
                 link <- getSingleSubfield datafield "u"
@@ -125,6 +129,7 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
         // Criterion for adding a book: currently that it has a parsed 
         // call number.
         if Option.isSome lcCallNum then
+            printfn "Adding book: %s" title.Value
             books.Add({
                         Title = title.Value + 
                                 if subtitle.IsSome then (" " + subtitle.Value) else "";

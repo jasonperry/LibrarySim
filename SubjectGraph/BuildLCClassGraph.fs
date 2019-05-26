@@ -41,6 +41,7 @@ let npIndex = NamePrefixIndex.Create()
 let insertNode (graph: SubjectGraph) node = 
     match npIndex.FindExact(node.subdividedName) with 
         | Some exactMatch -> 
+            // Should this be done in the SubjectGraph insert code?
             printfn "Subject %A already in index" node.name 
             exactMatch
         | None -> 
@@ -101,7 +102,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
                 | None -> ()
             if datafield.Tag = 153 then
-                // attempt to monadize
+                // attempt to use computation expressions
                 (*cnRangeStr <- maybe {   // Wild! mutable assignment from monad!
                     let! tableField = getSingleSubfield datafield "z"
                     let! startField = getSingleSubfield datafield "a"
@@ -158,16 +159,16 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 subdividedName = List.ofSeq subjectNames;
                 cnString = cnRangeStr; 
                 callNumRange = 
-                    if Option.isSome cnRangeStr then
-                        // TODO: handle exceptions (I want to see them for now)
+                    match cnRangeStr with
+                    | Some rstr -> 
                         try 
-                            Some (CNRange.parse cnRangeStr.Value)
+                            Some (CNRange.parse rstr)
                         with
-                            | CallNumberError errstr -> 
-                                printfn "Error with CNRange #%d: %s" recordCount errstr 
-                                None
-                    else 
-                        None;
+                        | CallNumberError errstr -> 
+                            printfn "Error with CNRange #%d: %s" recordCount errstr 
+                            None
+                    | None -> None
+                    ;
                 broader = new List<SubjectNode>(); 
                 narrower = new List<SubjectNode>();
                 books = new List<BookRecord>();
@@ -178,23 +179,14 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
             |> ignore *)
         recordCount <- recordCount + 1
         if recordCount % 1111 = 0 then 
-            printfn "============= %d\n%A\n" recordCount subjectNames
+            printfn "============= %d\n" recordCount
+            // printfn "============= %d\n%A\n" recordCount subjectNames
     printfn "Processed %d records"  recordCount 
     printfn "          %d with no call numbers" withNoCallNum
     printfn "          %d added to graph" recordsAdded
     theGraph
 
-// Basically a SubjectGraph, but I'll need to pull from it.
-// How about: SubjectNodes, but a different structure based on
-//  pulling out the subject headings, matching complex subject strings.
-// Maybe it will obviate TopLevel Graph
-// If I only use this and not the LCSH, have to make up my own IRIs.
-
 let buildGraph filename outputGraphFileName = 
-    (* let file = File.OpenRead(gzfile)
-    let instream = new StreamReader(new GZipStream(file, mode=CompressionMode.Decompress))
-    let reader = XmlReader.Create(instream)
-    reader.MoveToContent() |> ignore // Can I avoid this or put it inside readRecords? *)
     let reader = getXmlReader filename
     try 
         let startGraph = BuildTopLevel.buildGraph () // OR SubjectGraph.emptyGraph()
