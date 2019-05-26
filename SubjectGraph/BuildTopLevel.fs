@@ -18,7 +18,8 @@ let graphFileName = "output/TopLevelIndex.sgb"
 // [<Literal>] 
 // let DATADIR = @"./indexdata/" // OK for type provider on Windows, but not for running!
 [<Literal>]
-let CSVFILE = @"indexdata/TopLevelIndex.csv"
+//let CSVFILE = @"indexdata/TopLevelIndex.csv"
+let CSVFILE = @"indexdata/TopLevelIndex-toponly.csv"
 
 type LOCIndex = FSharp.Data.CsvProvider<CSVFILE, AssumeMissingValues=true>
 
