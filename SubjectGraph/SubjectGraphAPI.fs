@@ -137,7 +137,9 @@ module BooksResult =
 
   let ofNode (node : SubjectNode) = {
     thisSubject = SubjectNode.toSubjectInfo node
-    books = List.ofSeq node.books
+    // FIXME: sorting assumes there's a call number.
+    books = Seq.sortBy (fun (br : BookRecord) -> br.LCCallNum.Value) node.books
+            |> List.ofSeq
   }
 
   let toHtml (bres : BooksResult) = 

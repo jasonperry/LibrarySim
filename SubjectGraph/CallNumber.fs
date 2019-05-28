@@ -144,7 +144,7 @@ module LCCN =
         && cn1.cutter2 = cn2.cutter2
     /// True if first call number is more specific but otherwise equal. Equal is false.
     /// Needed for correct range containment, using only <= misses edge cases.
-    let moreSpecific cn1 cn2 = 
+    let isMoreSpecific cn1 cn2 = 
         cn1.letters = cn2.letters
         && (cn1.number.IsSome && cn2.number.IsNone // any cases where number is none & rest isn't?
             // new simplified version.
@@ -162,6 +162,25 @@ module LCCN =
                         || cn1.cutter2.IsSome && cn2.cutter2.IsSome 
                         && fst (cn1.cutter2.Value) = fst (cn2.cutter2.Value)
                         && (snd (cn1.cutter2.Value)).IsSome && (snd(cn2.cutter2.Value)).IsNone)))))
+    
+    /// Return which of two call numbers is more specific, or the first if they 
+    /// are equally specific. 
+    let mostSpecificCN cn1 cn2 = 
+        if cn1.number.IsSome && cn2.number.IsNone then cn1
+        elif cn1.number.IsNone && cn2.number.IsSome then cn2
+        elif cn1.number.IsSome && cn2.number.IsSome then
+            if cn1.decimal.IsSome && cn2.decimal.IsNone then cn1
+            elif cn1.decimal.IsNone && cn2.decimal.IsSome then cn2
+            elif cn1.decimal.IsSome && cn2.decimal.IsSome then 
+                if cn1.cutter1.IsSome && cn2.cutter1.IsNone then cn1
+                elif cn1.cutter1.IsNone && cn2.cutter1.IsSome then cn2
+                elif cn1.cutter1.IsSome && cn2.cutter2.IsSome then
+                    if cn1.cutter2.IsSome && cn2.cutter2.IsNone then cn1
+                    elif cn1.cutter2.IsNone && cn2.cutter2.IsSome then cn2
+                    else cn1
+                else cn1
+            else cn1
+        else cn1
     // built-in compare seems to work fine so far.
     (* static member (<=) (cn1, cn2) = 
         cn1.letters <= cn2.letters 
@@ -310,7 +329,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
     let contains range cn =
         range.startCN <= cn && cn <= range.endCN
         // This catches the case where e.g. the last B "BX" is meant to include "BX7864"
-        || range.startCN <= cn && LCCN.moreSpecific cn range.endCN
+        || range.startCN <= cn && LCCN.isMoreSpecific cn range.endCN
 
     let isSubRange subrange range = 
         // Update to not use contains, but its own logic.
@@ -319,7 +338,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
              // heuristic: only allow the moreSpecific case if 
              // 1) it's not a single-CN range,  2) they don't have the same start.
              || range.startCN <> range.endCN && range.startCN <> subrange.startCN
-                && LCCN.moreSpecific subrange.endCN range.endCN)
+                && LCCN.isMoreSpecific subrange.endCN range.endCN)
 
     /// Comparison function used to sort output.
     let compare ropt1 ropt2 = 
@@ -333,6 +352,13 @@ module CNRange = // nice if it could be a functor over types of CNs...
                 elif range1.startCN = range2.startCN then 0
                 else 1
 
+    let mostSpecificRange r1 r2 = 
+        if r1.startCN = r1.endCN && r2.startCN <> r2.endCN then r1
+        elif r1.startCN <> r1.endCN && r2.startCN = r2.endCN then r2
+        elif r1.startCN = r1.endCN && r2.startCN = r2.endCN then
+            if LCCN.mostSpecificCN r1.startCN r2.startCN = r2.startCN then r2 else r1
+        else // they're both ranges, so we don't care
+            r1
 /// Tree for parent/child relationships of CN Ranges.
 /// Lookup of existing nodes can be done in SubjectGraph.CNIndex
 /// TODO: Needs parent?

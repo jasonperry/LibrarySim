@@ -222,9 +222,18 @@ module SubjectGraph =
                 Seq.filter (fun nd -> if Option.isNone nd.callNumRange then false
                                       else CNRange.contains nd.callNumRange.Value cn) 
                            atnode.narrower
-            match Seq.tryHead candidates with 
-            | Some node -> searchParent node 
-            | None -> atnode
+            match List.ofSeq candidates with 
+            | head :: rest -> // get most specific range.
+                List.fold 
+                    (fun nd1 nd2 -> 
+                        if CNRange.mostSpecificRange nd1.callNumRange.Value nd2.callNumRange.Value 
+                            = nd2.callNumRange.Value
+                        then nd2
+                        else nd1) 
+                    head
+                    rest
+                |> searchParent
+            | [] -> atnode
         searchParent graph.topNode
 
     /// Search subject names for a string under a given starting node, 
@@ -494,6 +503,7 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
         |> Some
 
 /// Add a book's subjects to a graph (and the book too if selected)
+/// NOT CURRENTLY USED for CN-based graph.
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
     // Try to add a subject for each name, get node back 
     let nodes = book.Subjects
