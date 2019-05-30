@@ -102,22 +102,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
                 | None -> ()
             if datafield.Tag = 153 then
-                // attempt to use computation expressions
-                (*cnRangeStr <- maybe {   // Wild! mutable assignment from monad!
-                    let! tableField = getSingleSubfield datafield "z"
-                    let! startField = getSingleSubfield datafield "a"
-                    let! endField = getSingleSubfield datafield "c"
-                    let! lcCallNumStart = if tableField.Contains("-")
-                                          then None 
-                                          else Some (tableField + startField)
-                                          |> Option.orElse (Some startField)   
-                    let! lcCallNumEnd =  if tableField.Contains("-")
-                                         then None
-                                         else Some (tableField+endField)
-                                         |> Option.orElse (Some endField)
-                                         |> Option.orElse (Some startField)
-                    return (lcCallNumStart + "-" + lcCallNumEnd)
-                } *)
+                // DELETED: former attempt to use computation expressions
                 // Note: Some have alt call numbers at "c". How to deal? or is it a coding error?
                 let tableField = getSingleSubfield datafield "z" |? ""
                 let lcCallNumStart = // Option.lift2 (+) tableField (getSingleSubfield datafield "a")
@@ -128,7 +113,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 let lcCallNumEnd = 
                     match getSingleSubfield datafield "c" with 
                     | None -> None
-                    | Some c when tableField.Contains("-") -> None
+                    | Some _ when tableField.Contains("-") -> None
                     | Some c -> Some (tableField + c)
                 cnRangeStr <- 
                     match lcCallNumStart with 
@@ -140,6 +125,11 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 subjectNames.AddRange(getAllSubfields datafield "h")
                 subjectNames.AddRange(getAllSubfields datafield "j")
                 callNumCount <- callNumCount + 1
+            if datafield.Tag = 253 then // "See" cross reference
+                match getSingleSubfield datafield "a" with
+                | None -> ()
+                | Some a -> 
+                    
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
             Logger.Error <| "No call number entry (153) or string for record " + controlNumber.Value

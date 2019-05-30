@@ -200,7 +200,7 @@ module SubjectGraph =
         }
 
     /// Probably more efficient than maintaining the prefixIndex, but not sufficient.
-    /// TODO: move this into a "SubjectSegmentIndex" module, like with CNIndex.
+    /// TODO: move this into a "SubjectSegmentIndex" module.
     let findLongestPrefixSubj graph (splitSubj : string list) = 
         let rec findit slist = 
             match slist with 
@@ -246,7 +246,7 @@ module SubjectGraph =
                 Seq.map search' fromnode.narrower
                 |> Seq.concat |> Seq.toList
         search' graph.uriIndex.[startURI] // need exception handling? here?
-
+    
     /// Totally awesome, perfect, clear, generic node insertion function.
     /// Dependency injection! an isChild comparison function: CNRange.isSubRange
     /// Will not create a new top node.
@@ -363,6 +363,8 @@ let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) =
         true
     else 
         Seq.exists (fun n -> isBroaderThan graph uri1 n.uri) node2.broader
+
+(******** Stuff below here is old: SPARQL querying functions and CLI. *******)
 
 // Not used by addSubjectByCN (but may be added back for more logic)
 let getBroaderTerms (subj : Uri) = 
@@ -534,7 +536,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
 
 /// Loop to browse a graph. Currently only does a tree walk (no sideways links)
 /// To make generic: pass in a "getCommand", "outputSubjectList" and "outputBookList" funs. 
-let browseGraph (graph : SubjectGraph) = 
+let browseGraphCLI (graph : SubjectGraph) = 
     // Remember our path back to the root. 
     let hist = new Stack<SubjectNode> ()
     (* Might like to print out some level info. *)
@@ -606,7 +608,6 @@ open RDFSharp.Model
 let loadSchema filename = 
     // let g = RDFGraph.FromFile (RDFModelEnums.RDFFormats.RdfXml, filename)
     printf "did something."
-
 
 let hello name =
     printfn "Hello %s" name

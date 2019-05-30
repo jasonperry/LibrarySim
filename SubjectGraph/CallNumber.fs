@@ -8,7 +8,7 @@ open Common
 
 exception CallNumberError of string
 
-// BEST REGEX EVER 
+// BEST REGEX EVAR 
 // Still to check: how many digits can cutter numbers and decimals have? 
 // To fix: 1st cutter can be something besides letter + digits 
 let LCCN_REGEX = @"^([A-Z]{1,3})"           // group 1: call letters
@@ -111,32 +111,9 @@ module LCCN =
                        else Some (groups.[9].[1..]) 
             }
         else
+            // DELETED: code to try partial match.
             raise <| CallNumberError ("Could not parse LOC Call Number " + cnString)
-            (* let m = Regex.Match(cnString, LCCN_PARTIAL_REGEX) // removed toUpper()
-            if m.Success then
-                let groups = [ for g in m.Groups -> g.Value ]
-                {
-                    letters = groups.[1];
-                    number = if groups.[3] = "" then None
-                             else Some (int (groups.[3]));
-                    decimal = if groups.[4] = "" then None 
-                              else Some (decimal (groups.[4]));
-                    cutter1 = if groups.[5] = "" then None 
-                              // Skip initial dot 
-                              else Some (groups.[5].[1], 
-                                         if groups.[5].Length > 2 
-                                         then Some (Decimal.Parse ("." + (groups.[5].[2..])))
-                                         else None);
-                    cutter2 = if groups.[6] = "" then None 
-                              else Some (groups.[6].[0], 
-                                         if groups.[6].Length > 2 
-                                         then Some (int (groups.[6].[2..]))
-                                         else None);
-                    date = None;
-                    misc = None
-                }
-            else
-                raise <| CallNumberError ("Could not parse LOC Call Number " + cnString) *)
+
     /// True if two call numbers are the same except for year and misc.
     let sameTitle cn1 cn2 = 
         cn1.letters = cn2.letters && cn1.number = cn2.number
@@ -259,21 +236,6 @@ module CNRange = // nice if it could be a functor over types of CNs...
         else 
             (String.concat "" cnSegments.[..matchPos-1]) + suffixString
 
-        (* try 1 // scan backwards until there's a match at a position where the character
-        // class changes (which should be a boundary between CN segments)
-        let mutable pos = cnString.Length - 1
-        while (cnString.[pos] <> suffixString.[0] || 
-               sameClass cnString.[pos - 1] cnString.[pos]) do
-            pos <- pos - 1
-        cnString.[..pos] + suffixString *)
-        (* // try 2: scan backwards until char class matches, then stop when it doesn't
-        let mutable pos = cnString.Length - 1
-        while not (sameClass cnString.[pos] suffixString.[0]) do 
-            pos <- pos - 1
-        while sameClass cnString.[pos] suffixString.[0] do 
-            pos <- pos - 1 
-        cnString.[..pos] + suffixString *)
-
     let parse (s : string) = 
         //printfn "Trying to parse CN %s" s
         let cnStrings = s.Split [|'-'|]
@@ -353,41 +315,15 @@ module CNRange = // nice if it could be a functor over types of CNs...
                 else 1
 
     let mostSpecificRange r1 r2 = 
-        if r1.startCN = r1.endCN && r2.startCN <> r2.endCN then r1
+        // simplification: just look at the starts.
+        if LCCN.mostSpecificCN r1.startCN r2.startCN = r1.startCN then
+            r1
+        else
+            r2
+        (* if r1.startCN = r1.endCN && r2.startCN <> r2.endCN then r1
         elif r1.startCN <> r1.endCN && r2.startCN = r2.endCN then r2
         elif r1.startCN = r1.endCN && r2.startCN = r2.endCN then
             if LCCN.mostSpecificCN r1.startCN r2.startCN = r2.startCN then r2 else r1
         else // they're both ranges, so we don't care
-            r1
-/// Tree for parent/child relationships of CN Ranges.
-/// Lookup of existing nodes can be done in SubjectGraph.CNIndex
-/// TODO: Needs parent?
-/// Should be obsoleted by improved node insertion code.
-(* 
-type CNRangeTree = { range: LCCNRange; children: CNRangeTree list }
-with 
-    /// Insert returns the node above where it was inserted, or the node itself
-    /// it it's a new root.
-    member this.insert cnRange = 
-        // special case: insert above top node. Hope it won't happen?
-        if CNRange.isSubRange this.range cnRange
-        then // new root.
-            { range = cnRange; children = [this] }
-        else 
-            match List.tryFind (fun nd -> CNRange.isSubRange cnRange nd.range) this.children with
-            // wait. It could either be a sibling or parent of all or some of the children!!
-            // What if it's a parent of some? Should replace just those and be a sibling of the rest.
-            // Wait again. This code should be where a node is inserted in the graph. 
-            //   ** Is what we need just a variable isChild function to pass in?? **
-            | None -> 
-                let myChildren = List.filter 
-                { range = this.range; 
-                        children = ({range=cnRange; children=[]})::this.children }
-            | Some subtree -> subtree.insert cnRange
-    member this.findParent cnRange = 
-        if CNRange.isSubRange this.range cnRange
-        then    
-            { range = cnRange; children = [this] }
-        else
-*)
-            
+            r1 *)
+
