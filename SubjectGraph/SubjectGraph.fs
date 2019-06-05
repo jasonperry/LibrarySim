@@ -27,6 +27,7 @@ type SubjectNode = {
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
     broader : List<SubjectNode>; // SubjectNode list;  So sad, had to make it mutable...
     narrower : List<SubjectNode>; // mutable; new parents not added, but children are
+    seeAlso: crossrefInfo option;
     books : List<BookRecord>;
     mutable booksUnder : int  // to keep a count
 }
@@ -162,7 +163,8 @@ type SubjectGraph = {
         // topLevel : List<SubjectNode>; 
         topNode : SubjectNode;
         // went back to immutable lists. Even broaders won't actually be added twice.
-        cnIndex : Dictionary<LCCNRange, SubjectNode list>;  // maybe not unique 
+        // UPDATE: used to be a list, but now I want to assume it's unique. 
+        cnIndex : Dictionary<LCCNRange, SubjectNode>;  
         subjectNameIndex : Dictionary<string, SubjectNode list>;
         subjectPrefixIndex : NamePrefixIndex; // hopefully obsolete.
         // should be unique...hashset? Can we make out of BasicURI...yes.
@@ -183,13 +185,14 @@ module SubjectGraph =
             cnString = Some "A-ZZ"; // just as a backup
             broader = new List<SubjectNode>(); // formerly SubjectNode list
             narrower = new List<SubjectNode>(); 
+            seeAlso = None;
             books = new List<BookRecord>();
             booksUnder = 0  // to keep a count
         }
         let uriIndex = new Dictionary<_,_>()
         uriIndex.Add(topNode.uri, topNode)
         let cnIndex = new Dictionary<_,_> ();
-        cnIndex.Add(topNode.callNumRange.Value, [topNode])
+        cnIndex.Add(topNode.callNumRange.Value, topNode)
         // Don't bother adding top to name indexes.
         { 
             topNode = topNode;
@@ -235,7 +238,19 @@ module SubjectGraph =
                 |> searchParent
             | [] -> atnode
         searchParent graph.topNode
+    
+    /// Return the node for a given CN range, trying exact match first,
+    ///  else find the most direct parent of that range.
+    /// (Will be) used to generate a link to follow for "see also".
+    let findCNRange graph (cnRange: LCCNRange) = 
+        if graph.cnIndex.ContainsKey cnRange then
+            graph.cnIndex.[cnRange]
+        elif graph.cnIndex.ContainsKey {cnRange with endCN = cnRange.startCN} then
+            graph.cnIndex.[{cnRange with endCN = cnRange.startCN}]
+        else
+            findParentByCallNumber graph cnRange.startCN
 
+        
     /// Search subject names for a string under a given starting node, 
     /// returning list of only topmost nodes that match.
     let search graph startURI (searchStr : string) = 
@@ -246,7 +261,7 @@ module SubjectGraph =
                 Seq.map search' fromnode.narrower
                 |> Seq.concat |> Seq.toList
         search' graph.uriIndex.[startURI] // need exception handling? here?
-    
+
     /// Totally awesome, perfect, clear, generic node insertion function.
     /// Dependency injection! an isChild comparison function: CNRange.isSubRange
     /// Will not create a new top node.
@@ -288,8 +303,9 @@ module SubjectGraph =
         match newNode.callNumRange with 
             | Some cn -> 
                 if graph.cnIndex.ContainsKey cn then
-                    graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
-                else graph.cnIndex.Add (cn, [newNode])
+                    printfn "Warning! Overwriting existing subject for CN range %A" cn
+                    // graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
+                graph.cnIndex.[cn] <- newNode
             | None -> ()
 
     // mapSubTree function: apply a function recursively to the subtree starting at a node.
@@ -478,6 +494,7 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
                     None
             broader = new List<SubjectNode>(); // (parents);
             narrower = new List<SubjectNode>(); //(children); 
+            seeAlso = None;
             books = new List<BookRecord>();
             booksUnder = 0
         }

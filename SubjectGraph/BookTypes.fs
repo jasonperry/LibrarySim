@@ -13,6 +13,9 @@ type SubjectInfo = {
   itemsUnder : int;
 }
 
+[<Struct>]
+type crossrefInfo = { desc: string; refs: (LCCNRange * string) list}
+
 /// Primary type for information about a single catalog item.
 type BookRecord = {
     Title: string

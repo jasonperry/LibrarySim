@@ -35,11 +35,11 @@ let buildGraph () =
         let altnames = List.filter ((<>) "") [row.Altlabel1; row.Altlabel2; row.Altlabel3]
         let subjName = row.``Auth Label``
         let node = {
-            uri = System.Uri row.URI
-            name = subjName
-            subdividedName = SubjectNode.splitSubjectName subjName
+            uri = System.Uri row.URI;
+            name = subjName;
+            subdividedName = SubjectNode.splitSubjectName subjName;
             cnString = if row.``Call Num`` = "" then None
-                           else Some row.``Call Num``
+                           else Some row.``Call Num`` ;
             callNumRange = 
                 if row.``Call Num`` = "" then None
                 else 
@@ -50,12 +50,12 @@ let buildGraph () =
                         if cnStrings.Length = 1 
                         then startCN
                         else LCCN.lettersOnlyCN cnStrings.[1]
-                    Some (CNRange.create startCN endCN)
-                                    
+                    Some (CNRange.create startCN endCN) ;
             // Don't need to add parents manually, done by call number!
-            broader = new List<_>() // (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
-            narrower = new List<SubjectNode>()
-            books = new List<BookRecord>()
+            broader = new List<_>(); // (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
+            narrower = new List<SubjectNode>();
+            seeAlso = None;
+            books = new List<BookRecord>();
             booksUnder = 0
         }
         nodeCount <- nodeCount + 1

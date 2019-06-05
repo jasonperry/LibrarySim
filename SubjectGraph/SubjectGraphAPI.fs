@@ -28,6 +28,7 @@ type SubjectsResult = {
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
   cnRange : string;
+  seeAlso: crossrefInfo option
 }
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
@@ -47,6 +48,7 @@ module SubjectsResult =
       |> List.sortWith (fun (si1: SubjectInfo) si2 -> 
                             CNRange.compare si1.cnRange si2.cnRange)
     cnRange = node.cnString |? ""
+    seeAlso = node.seeAlso
   }
   let nodeListToInfoList nodes = 
       List.map 
@@ -58,14 +60,29 @@ module SubjectsResult =
            })
           nodes
 
+  /// make a clickable link to a node's URI.
+  let makeURILink (uri : System.Uri) text = 
+      "<a href=\"" + appRoot + "browse?uri=" 
+      + uri.ToString() + "\">" +  HttpUtility.HtmlEncode(text) 
+      + "</a>"
+
   let formatSubjectInfo (si : SubjectInfo) = 
       // TODO: find a way to get the app's own URL...from the config?
       "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
-      + "<td><a href=\"" + appRoot + "browse?uri=" 
-      + si.uri.Value.ToString() + "\">" +  HttpUtility.HtmlEncode(si.name) 
-      + " (" + string si.itemsUnder + ") </a></td>"
+      + "<td>" + makeURILink si.uri.Value 
+                             (si.name + " (" + string si.itemsUnder + ")")
+      + "</td>"
 
-  let toHtml (sr : SubjectsResult) = 
+  let formatCrossRefs g (cr : crossrefInfo) = 
+    cr.desc + ":<br/>" 
+    + (cr.refs 
+       |> List.map 
+          (fun (range, desc) -> 
+              makeURILink (SubjectGraph.findCNRange g range).uri 
+                          (CNRange.toString range) + " " + desc)
+       |> String.concat "<br/>")
+
+  let toHtml g (sr : SubjectsResult) = 
       (if List.isEmpty sr.broader then ""
        else
           "<table><tr><td>Up: </td>" 
@@ -73,8 +90,11 @@ module SubjectsResult =
           + "</td></tr></table>")
       + "<h2>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
       + "<p>Call number range: " + sr.cnRange + "<br />"
-      + "Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
-      + "<table><tr>"
+      + "Items under this heading: " + (string sr.thisSubject.itemsUnder) + "<br/>"
+      +  match sr.seeAlso with 
+         | Some sa -> "Cross references: <br/>" + formatCrossRefs g sa 
+         | None -> ""
+      + "</p><table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
       + "</tr><table>"
 
@@ -213,7 +233,7 @@ let dispatch g =
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> Successful.OK 
                                   (pageHeader r 
-                                   + SubjectsResult.toHtml (getSubjectResult g r.query)
+                                   + SubjectsResult.toHtml g (getSubjectResult g r.query)
                                    + "<hr>"
                                    + BooksResult.toHtml (getBookResult g r.query)
                                    + "</body></html>")) 
@@ -305,7 +325,7 @@ let main argv =
   | "browse" ->
       printfn "Loading graph %s" argv.[1]
       let graph = loadGraph argv.[1]
-      browseGraph graph
+      browseGraphCLI graph
       0
   | "serve" -> 
       let theGraph = loadGraph argv.[1]

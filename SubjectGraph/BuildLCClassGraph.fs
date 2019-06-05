@@ -36,6 +36,51 @@ let mutable nodeCount = 0
 
 let npIndex = NamePrefixIndex.Create()
 
+/// I'm breaking these out into functions now. TODO: this for 153 also
+/// (there can be multiple call numbers)
+let parse253 (datafield: MarcXmlType.Datafield) = 
+    let mutable desc =
+        if datafield.Subfields.[0].Code = "i" then
+            datafield.Subfields.[0].Value
+        else ""
+    let mutable i = if desc = "" then 0 else 1
+    let rec scanSubfields () =
+        if i >= datafield.Subfields.Length then
+            []
+        else
+            let sfi = datafield.Subfields.[i]
+            match sfi.Code with
+            | "a" -> 
+                let cnStartStr = 
+                    if sfi.Value.EndsWith(";") || sfi.Value.EndsWith(",") || sfi.Value.EndsWith("+")
+                    then sfi.Value.[0..(sfi.Value.Length - 2)]
+                    else sfi.Value
+                let cnEndStr = 
+                    if datafield.Subfields.Length > i+1 && datafield.Subfields.[i+1].Code = "c" then
+                        i <- i+1 
+                        if datafield.Subfields.[i].Value.EndsWith(";") 
+                           || datafield.Subfields.[i].Value.EndsWith(",") 
+                           || datafield.Subfields.[i].Value.EndsWith("+")
+                        then datafield.Subfields.[i].Value.[0..(datafield.Subfields.[i].Value.Length - 2)]
+                        else datafield.Subfields.[i].Value
+                    else ""
+                let desc = 
+                    if datafield.Subfields.Length > i+1 && datafield.Subfields.[i+1].Code = "i" then
+                        i <- i + 1
+                        datafield.Subfields.[i].Value
+                    else ""
+                i <- i + 1
+                let parsedStart = LCCN.parse cnStartStr
+                ({startCN = parsedStart; 
+                    endCN = if cnEndStr = "" then parsedStart else LCCN.parse cnEndStr}, 
+                    desc) :: scanSubfields ()
+            | _ -> // FIXME: should detect a "just i" here and set the desc.
+                printfn "Expected 253 subfield code 'a', got '%s'" sfi.Code
+                desc <- desc + ". " + sfi.Value
+                i <- i + 1
+                scanSubfields ()
+    { desc = desc; refs = scanSubfields () } // Caller should log error if empty.
+
 /// Populate a Classification subject node's parents and children, then add to graph.
 /// NOW no longer populating. 
 let insertNode (graph: SubjectGraph) node = 
@@ -91,6 +136,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         let mutable controlNumber = None
         let mutable cnRangeStr = None
         let subjectNames = new List<string>()
+        let mutable crossRefs = None
         callNumCount <- 0
         for datafield in record.Datafields do
             // Is it always okay to get the control number from the datafield
@@ -125,11 +171,22 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 subjectNames.AddRange(getAllSubfields datafield "h")
                 subjectNames.AddRange(getAllSubfields datafield "j")
                 callNumCount <- callNumCount + 1
+
             if datafield.Tag = 253 then // "See" cross reference
-                match getSingleSubfield datafield "a" with
-                | None -> ()
-                | Some a -> 
-                    
+                let seeAlso = 
+                    try
+                        Some (parse253 datafield)
+                    with CallNumberError errstr -> 
+                        printfn "CallNumberError in field 253: %s" errstr
+                        None
+                // DEBUG: May remove this check if it never happens.
+                if Option.isSome seeAlso && seeAlso.Value.desc = "" && seeAlso.Value.refs.IsEmpty then
+                    printfn "Warning: empty 'see' data for %A; not adding" controlNumber
+                else 
+                    if Option.isSome cnRangeStr then
+                        printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
+                    crossRefs <- seeAlso
+
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
             Logger.Error <| "No call number entry (153) or string for record " + controlNumber.Value
@@ -165,6 +222,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                     ;
                 broader = new List<SubjectNode>(); 
                 narrower = new List<SubjectNode>();
+                seeAlso = crossRefs;
                 books = new List<BookRecord>();
                 booksUnder = 0
             } |> ignore
