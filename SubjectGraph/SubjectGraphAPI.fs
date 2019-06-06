@@ -28,7 +28,7 @@ type SubjectsResult = {
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
   cnRange : string;
-  seeAlso: crossrefInfo option
+  seeAlso: CrossrefInfo option
 }
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
@@ -73,16 +73,20 @@ module SubjectsResult =
                              (si.name + " (" + string si.itemsUnder + ")")
       + "</td>"
 
-  let formatCrossRefs g (cr : crossrefInfo) = 
+  let formatCrossRefs (cr : CrossrefInfo) = 
     cr.desc + ":<br/>" 
     + (cr.refs 
        |> List.map 
-          (fun (range, desc) -> 
-              makeURILink (SubjectGraph.findCNRange g range).uri 
-                          (CNRange.toString range) + " " + desc)
+          // Fails on graph with unresolve cross-ref
+          (fun (range, desc, uriOpt) ->
+              match uriOpt with
+              | Some uri -> 
+                  makeURILink uri ((CNRange.toString range) + " " + desc)
+              | None -> (CNRange.toString range) + " " + desc
+          )
        |> String.concat "<br/>")
 
-  let toHtml g (sr : SubjectsResult) = 
+  let toHtml (sr : SubjectsResult) = 
       (if List.isEmpty sr.broader then ""
        else
           "<table><tr><td>Up: </td>" 
@@ -92,7 +96,7 @@ module SubjectsResult =
       + "<p>Call number range: " + sr.cnRange + "<br />"
       + "Items under this heading: " + (string sr.thisSubject.itemsUnder) + "<br/>"
       +  match sr.seeAlso with 
-         | Some sa -> "Cross references: <br/>" + formatCrossRefs g sa 
+         | Some sa -> "Cross references: <br/>" + formatCrossRefs sa 
          | None -> ""
       + "</p><table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
@@ -233,7 +237,7 @@ let dispatch g =
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> Successful.OK 
                                   (pageHeader r 
-                                   + SubjectsResult.toHtml g (getSubjectResult g r.query)
+                                   + SubjectsResult.toHtml (getSubjectResult g r.query)
                                    + "<hr>"
                                    + BooksResult.toHtml (getBookResult g r.query)
                                    + "</body></html>")) 

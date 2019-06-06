@@ -26,18 +26,12 @@ open CallNumber
 open SubjectGraph
 // open BuildTopLevel // It's passed in now.
 
-
-(* if fsi.CommandLineArgs.Length < 2 then
-    printfn "Need MarcXML.gz file argument"
-    exit(1)
-let xmlfile = fsi.CommandLineArgs.[1] *)
-
 let mutable nodeCount = 0
 
 let npIndex = NamePrefixIndex.Create()
 
-/// I'm breaking these out into functions now. TODO: this for 153 also
-/// (there can be multiple call numbers)
+/// Parse all subfields of "See also" and create a CrossRefInfo object. 
+/// TODO: function like this for 153 also (there can be multiple call numbers)
 let parse253 (datafield: MarcXmlType.Datafield) = 
     let mutable desc =
         if datafield.Subfields.[0].Code = "i" then
@@ -70,19 +64,20 @@ let parse253 (datafield: MarcXmlType.Datafield) =
                         datafield.Subfields.[i].Value
                     else ""
                 i <- i + 1
+                // parsing exceptions shoud be caught by caller.
                 let parsedStart = LCCN.parse cnStartStr
                 ({startCN = parsedStart; 
                     endCN = if cnEndStr = "" then parsedStart else LCCN.parse cnEndStr}, 
-                    desc) :: scanSubfields ()
-            | _ -> // FIXME: should detect a "just i" here and set the desc.
+                 desc, None) :: scanSubfields ()
+            | _ -> // FIXME: should detect an "i" or "z" here and do the right thing.
                 printfn "Expected 253 subfield code 'a', got '%s'" sfi.Code
                 desc <- desc + ". " + sfi.Value
                 i <- i + 1
                 scanSubfields ()
     { desc = desc; refs = scanSubfields () } // Caller should log error if empty.
 
-/// Populate a Classification subject node's parents and children, then add to graph.
-/// NOW no longer populating. 
+/// Add node to graph by calling SubjectGraph.insertNode with the 
+/// CNRange comparison function. 
 let insertNode (graph: SubjectGraph) node = 
     match npIndex.FindExact(node.subdividedName) with 
         | Some exactMatch -> 
@@ -97,37 +92,15 @@ let insertNode (graph: SubjectGraph) node =
             | None -> 
                 printfn "No call number for %s, not inserting (for now)" node.name
             node
-            (* npIndex.Add node
-            // assume each node added just once, so no add..TEST IT
-            let parent =  npIndex.MaxPrefixMatch(node)
-            // but will it 'wedge in'?? Number of children should be *reduced* as it goes along.
-            let children = // OR just take existing children of parent? might be none.
-                npIndex.MinExtensions node.subdividedName
-                //let ch1 = npIndex.SingleExtensions node.subdividedName
-                //if not ch1.IsEmpty then ch1
-                //else npIndex.AllExtensions(node.subdividedName) 
-            // Add parent
-            match parent with 
-                | Some pnode -> 
-                    node.broader.Add(pnode)
-                    // pnode.narrower.Add(node)
-                | None -> ()
-            // Add children and (don't) add this node as a parent of children.
-            node.narrower.AddRange(children)
-            // Let the Subject Graph code "wire up" everything else
-            SubjectGraph.insertNode graph node 
-            node *)
-            // ?? Should I temporarily add to top-level, then remove?
-            // ...no...how about add a flag to the node to indicate orphan?
-            //  current solution: just find the top level in post-processing.
 
-
-/// Create SubjectNode objects and send them to insertNode.
+/// Create a whole sequence of SubjectNode objects and insert them with 
+/// insertNode.
 let addClassRecords theGraph (records : MarcXmlType.Record seq) = 
     // let theGraph = SubjectGraph.emptyGraph()
     let mutable recordCount = 0
     let mutable withNoCallNum = 0
     let mutable callNumCount = 0
+    let mutable crossRefCount = 0
     let mutable recordsAdded = 0
     for record in records do
         (*let recEnum = records.GetEnumerator()
@@ -184,7 +157,8 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                     printfn "Warning: empty 'see' data for %A; not adding" controlNumber
                 else 
                     if Option.isSome cnRangeStr then
-                        printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
+                        //printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
+                        crossRefCount <- crossRefCount + 1
                     crossRefs <- seeAlso
 
         if callNumCount = 0 || cnRangeStr.IsNone then
@@ -235,6 +209,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
             // printfn "============= %d\n%A\n" recordCount subjectNames
     printfn "Processed %d records"  recordCount 
     printfn "          %d with no call numbers" withNoCallNum
+    printfn "          %d with cross-refs and CNs" crossRefCount
     printfn "          %d added to graph" recordsAdded
     theGraph
 
@@ -246,6 +221,7 @@ let buildGraph filename outputGraphFileName =
         // SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
         // printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
         reader.Close()
+        SubjectGraph.updateCrossrefs theGraph
         // instream.Close()
         // desperate attempt to reclaim memory before serialization.
         // ...now not needed? I found a better pickler.

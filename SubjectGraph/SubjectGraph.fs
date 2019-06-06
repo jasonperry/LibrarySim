@@ -23,11 +23,10 @@ type SubjectNode = {
     subdividedName : string list;
     callNumRange : LCCNRange option;
     cnString : string option; // just as a backup
-    // no explicit refs needed for these, F# uses reference semantics 
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
     broader : List<SubjectNode>; // SubjectNode list;  So sad, had to make it mutable...
     narrower : List<SubjectNode>; // mutable; new parents not added, but children are
-    seeAlso: crossrefInfo option;
+    seeAlso: CrossrefInfo option;
     books : List<BookRecord>;
     mutable booksUnder : int  // to keep a count
 }
@@ -358,6 +357,27 @@ module SubjectGraph =
                 let narrowerCopy = new List<_>(node.narrower) // so iteration won't fail.
                 Seq.iter (fun nd -> contract' nd (depth+1)) narrowerCopy
         contract' graph.topNode 0
+
+    /// This step is needed after all nodes are inserted, to find and grab
+    /// URI's of the best target node for a cross reference.
+    let updateCrossrefs graph = 
+        let rec update' atnode = 
+            match atnode.seeAlso with
+            | Some crinfo -> 
+                let rec genlist' crlist = 
+                    match crlist with
+                    | (range, desc, Some uri) :: rest -> 
+                        (range, desc, Some uri) :: genlist' rest
+                    | (range, desc, None) :: rest -> 
+                        let uri = (findCNRange graph range).uri
+                        (range, desc, Some uri) :: genlist' rest
+                    | [] -> []
+                crinfo.refs <- genlist' crinfo.refs
+            | None -> ()
+            Seq.iter update' atnode.narrower
+        update' graph.topNode
+
+                    
 
     /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?
