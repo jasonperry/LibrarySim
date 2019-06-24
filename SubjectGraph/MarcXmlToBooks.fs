@@ -23,11 +23,6 @@ open BookTypes
 open CallNumber
 open SubjectGraph
 
-(* if fsi.CommandLineArgs.Length < 2 then
-    printfn "Need MarcXML file argument"
-    exit(1)
-let xmlfile = fsi.CommandLineArgs.[1] *)
-
 let OUTDIR = @"C:\Users\Jason\code\LibrarySim\SubjectGraph\output\"
 let recordsFileName = OUTDIR + "gutenRecords.brb"
 
@@ -158,8 +153,7 @@ let processBooks xmlFilename =
     formatter.Serialize(stream, allbooks)
     stream.Close()
     printfn "Wrote records to file %s" recordsFileName
-            (* printfn "Found tag %d" datafield.Tag *)
-    // printfn "%A" (data.GetSample().Values)
+
 
 /// top-level function for adding full MARC catalog records to the classification graph.
 let addBooksToClassGraph (graph: SubjectGraph) xmlFilename = 

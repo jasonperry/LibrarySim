@@ -13,6 +13,7 @@ let XMLSAMPLE = DATADIR + "MarcRecordSample.xml"
 /// Giving a constant file name initializes the type provider magic.
 type MarcXmlType = XmlProvider<XMLSAMPLE> 
 
+/// Handles both gzipped and uncompressed MarcXml files.
 let getXmlReader filename =
     let file = File.OpenRead(filename)
     let instream = 
