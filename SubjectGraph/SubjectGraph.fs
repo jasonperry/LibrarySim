@@ -376,8 +376,7 @@ module SubjectGraph =
             | None -> ()
             Seq.iter update' atnode.narrower
         update' graph.topNode
-
-                    
+                   
 
     /// Part of finalizing a graph for browsing. Add all parent-less nodes to top level.
     /// Possible TODO: Put all such code in a "finalize" method that outputs a new type?

@@ -20,7 +20,7 @@ let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
 let appPort = 8080
 let appRoot = "http://" + listenIPs.[0] + ":" + (string appPort) + "/"
 
-/// Immutable SubjectNode info returned by the API, to be directly JSONized 
+/// Self-contained info about one graph node, to be directly JSONized 
 ///   and sent to the browser.
 /// ...should it contain a pointer to the books? or back to the node itself?
 type SubjectsResult = {
@@ -74,17 +74,20 @@ module SubjectsResult =
       + "</td>"
 
   let formatCrossRefs (cr : CrossrefInfo) = 
-    cr.desc + ":<br/>" 
+    cr.desc + ":<br/><bl>" 
     + (cr.refs 
        |> List.map 
           // Fails on graph with unresolve cross-ref
-          (fun (range, desc, uriOpt) ->
+          (fun (range, desc, uriOpt) -> 
+              "<li>" + 
               match uriOpt with
               | Some uri -> 
                   makeURILink uri ((CNRange.toString range) + " " + desc)
               | None -> (CNRange.toString range) + " " + desc
+              + "</li>"
           )
        |> String.concat "<br/>")
+    + "</bl>"
 
   let toHtml (sr : SubjectsResult) = 
       (if List.isEmpty sr.broader then ""
@@ -92,11 +95,11 @@ module SubjectsResult =
           "<table><tr><td>Up: </td>" 
           + (String.concat "</td><td>" (List.map formatSubjectInfo sr.broader))
           + "</td></tr></table>")
-      + "<h2>" + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
-      + "<p>Call number range: " + sr.cnRange + "<br />"
-      + "Items under this heading: " + (string sr.thisSubject.itemsUnder) + "<br/>"
+      + "<h2>" + sr.cnRange + " " + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
+      //+ "<p>Call number range: " + sr.cnRange + "<br />"
+      + "<p>Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       +  match sr.seeAlso with 
-         | Some sa -> "Cross references: <br/>" + formatCrossRefs sa 
+         | Some sa -> "<p> <b>Cross references:</b> " + formatCrossRefs sa + "</p>"
          | None -> ""
       + "</p><table><tr>"
       + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
@@ -108,17 +111,6 @@ module SubjectsResult =
       + String.concat "</tr><tr>" (List.map formatSubjectInfo infolist)
       + "</tr></table>"
 
-  /// Construct a result object corresponding to the top level. Now we have a top node
-  (* let topLevel (g : SubjectGraph) = 
-    let topSubjects = List.ofSeq (g.topLevel)
-    {
-      thisSubject = {uri = None; name = "Top Level"};
-      broader = [];
-      narrower = topSubjects
-        |> List.map (fun nd -> {uri = Some nd.uri; name = nd.name});
-      booksUnder = List.sumBy (fun (nd : SubjectNode) -> nd.booksUnder) topSubjects
-      cnRange = "A-Z"
-    } *)
 // end module SubjectsResult
 
 // TODO: monadize the error handling.  -> WebResult string
@@ -147,8 +139,6 @@ let getSubjectSearchResult (g : SubjectGraph) q =
         SubjectGraph.search g startUri searchStr
         |> SubjectsResult.nodeListToInfoList
     | _ -> []
-
-  
 
 /// Transmission type of all books under a SubjectNode.
 type BooksResult = {
@@ -180,6 +170,9 @@ module BooksResult =
     + (String.concat "</tr><tr>" (List.map bookfmt bres.books))
     + "</tr></table></div>"
 
+// end module BooksResult
+
+/// Return a BookResult object for a URI query.
 let getBookResult (g: SubjectGraph) q = 
   Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
   |> fun uriStr -> 
@@ -197,6 +190,7 @@ let getBookResult (g: SubjectGraph) q =
          else 
              BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
 
+/// Outputs the header for the SubjectGraph browsing web app.
 let pageHeader (r: HttpRequest) = 
     let uriStr = 
         match (r.queryParam "uri") with
@@ -221,6 +215,7 @@ let pageHeader (r: HttpRequest) =
     // + "<tr><td>" + locationStr + "</td></tr>"
     + "</table><hr>"
 
+/// Suave dispatcher for the SubjectGraph web app.
 let dispatch g =
   choose 
     [ GET >=> choose
@@ -259,8 +254,6 @@ let dispatch g =
       (* POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
           path "/goodbye" >=> Successful.OK "Good bye POST" ] *) ]
-
-// end module BooksResult
 
 [<EntryPoint>]
 let main argv =

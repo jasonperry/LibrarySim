@@ -157,7 +157,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                     printfn "Warning: empty 'see' data for %A; not adding" controlNumber
                 else 
                     if Option.isSome cnRangeStr then
-                        //printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
+                        printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
                         crossRefCount <- crossRefCount + 1
                     crossRefs <- seeAlso
 
@@ -213,6 +213,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
     printfn "          %d added to graph" recordsAdded
     theGraph
 
+/// Build and save the LC Call Number Class Graph.
 let buildGraph filename outputGraphFileName = 
     let reader = getXmlReader filename
     try 
@@ -221,6 +222,7 @@ let buildGraph filename outputGraphFileName =
         // SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
         // printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
         reader.Close()
+        printfn "Updating Cross-references..."
         SubjectGraph.updateCrossrefs theGraph
         // instream.Close()
         // desperate attempt to reclaim memory before serialization.
