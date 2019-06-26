@@ -302,7 +302,7 @@ module SubjectGraph =
         match newNode.callNumRange with 
             | Some cn -> 
                 if graph.cnIndex.ContainsKey cn then
-                    printfn "Warning! Overwriting existing subject for CN range %A" cn
+                    printfn "[Warning] Overwriting existing subject for CN range %s" (CNRange.toString cn)
                     // graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
                 graph.cnIndex.[cn] <- newNode
             | None -> ()
@@ -651,7 +651,8 @@ let hello name =
     printf "made a graph!"
 *)
 
-// deserialize. The opens are a hint that maybe this should go elsewhere.
+// deserialize. The opens are a hint that maybe this should go elsewhere...
+// or in a module.
 
 open System.IO // for file read and write 
 open MBrace.FsPickler
@@ -664,12 +665,12 @@ let loadGraph graphFileName =
     graph
 
 let saveGraph (graph: SubjectGraph) graphFileName = 
-    let binarySerializer = FsPickler.CreateBinarySerializer()
+    let serializer = FsPickler.CreateBinarySerializer()
     //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
     graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
-    let pickle = binarySerializer.Pickle(graph)
+    let pickle = serializer.Pickle(graph)
     let outfile = File.OpenWrite(graphFileName)
     //stream.Write(ZeroFormatterSerializer.Serialize(graph), 0, 0)
-    outfile.Write(binarySerializer.Pickle(graph), 0, pickle.Length)
+    outfile.Write(serializer.Pickle(graph), 0, pickle.Length)
     // graphFormatter.Serialize(stream, graph)
     outfile.Close()
