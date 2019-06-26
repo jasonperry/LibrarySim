@@ -14,11 +14,11 @@ open BookTypes
 open CallNumber
 open SubjectGraph
 open MarcXmlToBooks
+open System
 
 // TODO: put these in a configuration file, or get them from the app instance.
 let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
 let appPort = 8080
-let appRoot = "http://" + listenIPs.[0] + ":" + (string appPort) + "/"
 
 /// Self-contained info about one graph node, to be directly JSONized 
 ///   and sent to the browser.
@@ -61,54 +61,54 @@ module SubjectsResult =
           nodes
 
   /// make a clickable link to a node's URI.
-  let makeURILink (uri : System.Uri) text = 
-      "<a href=\"" + appRoot + "browse?uri=" 
+  let makeURILink appUrl (uri : System.Uri) text = 
+      "<a href=\"" + appUrl + "/browse?uri=" 
       + uri.ToString() + "\">" +  HttpUtility.HtmlEncode(text) 
       + "</a>"
 
-  let formatSubjectInfo (si : SubjectInfo) = 
+  let subjectInfoToHtml appUrl (si : SubjectInfo) = 
       // TODO: find a way to get the app's own URL...from the config?
       "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
-      + "<td>" + makeURILink si.uri.Value 
+      + "<td>" + makeURILink appUrl si.uri.Value 
                              (si.name + " (" + string si.itemsUnder + ")")
       + "</td>"
 
-  let formatCrossRefs (cr : CrossrefInfo) = 
+  let crossrefInfoToHtml appUrl (cr : CrossrefInfo) = 
     cr.desc + ":<br/><bl>" 
     + (cr.refs 
        |> List.map 
-          // Fails on graph with unresolve cross-ref
+          // Fails on graph with unresolved cross-ref
           (fun (range, desc, uriOpt) -> 
               "<li>" + 
               match uriOpt with
               | Some uri -> 
-                  makeURILink uri ((CNRange.toString range) + " " + desc)
+                  makeURILink appUrl uri ((CNRange.toString range) + " " + desc)
               | None -> (CNRange.toString range) + " " + desc
               + "</li>"
           )
        |> String.concat "<br/>")
     + "</bl>"
 
-  let toHtml (sr : SubjectsResult) = 
+  let toHtml appUrl (sr : SubjectsResult) = 
       (if List.isEmpty sr.broader then ""
        else
           "<table><tr><td>Up: </td>" 
-          + (String.concat "</td><td>" (List.map formatSubjectInfo sr.broader))
+          + (String.concat "</td><td>" (List.map (subjectInfoToHtml appUrl) sr.broader))
           + "</td></tr></table>")
       + "<h2>" + sr.cnRange + " " + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
       //+ "<p>Call number range: " + sr.cnRange + "<br />"
       + "<p>Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       +  match sr.seeAlso with 
-         | Some sa -> "<p> <b>Cross references:</b> " + formatCrossRefs sa + "</p>"
+         | Some sa -> "<p> <b>Cross references:</b> " + crossrefInfoToHtml appUrl sa + "</p>"
          | None -> ""
       + "</p><table><tr>"
-      + String.concat "</tr><tr>" (List.map formatSubjectInfo sr.narrower)
+      + String.concat "</tr><tr>" (List.map (subjectInfoToHtml appUrl) sr.narrower)
       + "</tr><table>"
 
-  let infoListToHtml (infolist : SubjectInfo list) =
+  let infoListToHtml appUrl (infolist : SubjectInfo list) =
       "<p>Found " + string (infolist.Length) + " results.</p>"
       + "<table><tr>"
-      + String.concat "</tr><tr>" (List.map formatSubjectInfo infolist)
+      + String.concat "</tr><tr>" (List.map (subjectInfoToHtml appUrl) infolist)
       + "</tr></table>"
 
 // end module SubjectsResult
@@ -232,7 +232,9 @@ let dispatch g =
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> Successful.OK 
                                   (pageHeader r 
-                                   + SubjectsResult.toHtml (getSubjectResult g r.query)
+                                   + SubjectsResult.toHtml 
+                                      (r.url.GetLeftPart(System.UriPartial.Authority))    
+                                      (getSubjectResult g r.query)
                                    + "<hr>"
                                    + BooksResult.toHtml (getBookResult g r.query)
                                    + "</body></html>")) 
@@ -240,7 +242,8 @@ let dispatch g =
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> Successful.OK
                                   (pageHeader r
-                                   + "<p><a href=\"" + appRoot + "browse?uri=" 
+                                   + "<p><a href=\"" + r.url.GetLeftPart(System.UriPartial.Authority) 
+                                   + "/browse?uri=" 
                                    + string (g.topNode.uri) + "\">Back to top</a></p>"
                                    + "<h2>Search result for: " 
                                    // Maybe I should deal with all the variables here, so the
@@ -248,12 +251,15 @@ let dispatch g =
                                    + (Option.ofChoice (r.queryParam "searchstr") |? ":empty:")
                                    // TODO: show the name of the node it's under. Need to return more search info?
                                    //+ " under: " + (Option.ofChoice (r.queryParam "uri") |? "(top)") + "</h2>"
-                                   + SubjectsResult.infoListToHtml (getSubjectSearchResult g r.query)
+                                   + SubjectsResult.infoListToHtml 
+                                        (r.url.GetLeftPart(System.UriPartial.Authority)) 
+                                        (getSubjectSearchResult g r.query)
                                    + "</body></html>"))
-        ]
+      ]
       (* POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
-          path "/goodbye" >=> Successful.OK "Good bye POST" ] *) ]
+          path "/goodbye" >=> Successful.OK "Good bye POST" ] *) 
+    ]
 
 [<EntryPoint>]
 let main argv =
@@ -333,6 +339,7 @@ let main argv =
                                 listenIPs 
         }
         (dispatch theGraph) //(Successful.OK "Hello, Suave!")
+      printfn "Life exists after dispatch"
       0
   | _ -> 
       printfn "Unknown argument: %s" argv.[0]
