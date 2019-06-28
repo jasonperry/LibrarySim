@@ -656,6 +656,14 @@ let hello name =
 
 open System.IO // for file read and write 
 open MBrace.FsPickler
+
+/// recreate BiserObjectify serialization code
+let buildSerializer () = 
+    let serinfo = 
+        BiserObjectify.Generator.Run
+            (typeof<int>,true, "./output/biser/", true, false, null)
+    printfn "%A" serinfo
+
 let loadGraph graphFileName = 
     //let booksFormatter = BinaryFormatter()
     let serializer = FsPickler.CreateBinarySerializer()

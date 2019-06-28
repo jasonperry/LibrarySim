@@ -341,6 +341,9 @@ let main argv =
         (dispatch theGraph) //(Successful.OK "Hello, Suave!")
       printfn "Life exists after dispatch"
       0
+  | "update" ->
+      SubjectGraph.buildSerializer()
+      0
   | _ -> 
       printfn "Unknown argument: %s" argv.[0]
       1
