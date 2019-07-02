@@ -115,12 +115,7 @@ module SubjectsResult =
 
 // TODO: monadize the error handling.  -> WebResult string
 // The ^^ is the "request combinator"
-let getSubjectResult g q = 
-   Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
-  |> fun uriStr -> 
-    (*if uriStr = "top" then 
-      SubjectsResult.topLevel g
-    else *)
+let getSubjectResult g uriStr = 
       // TODO: error handling
       SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
 
@@ -215,46 +210,79 @@ let pageHeader (r: HttpRequest) =
     // + "<tr><td>" + locationStr + "</td></tr>"
     + "</table><hr>"
 
+ 
+
 /// Suave dispatcher for the SubjectGraph web app.
 let dispatch g =
   choose 
     [ GET >=> choose
         [ // Need to setMimeType "text/html; charset=utf-8"
           path "/subject" 
-          >=> request (fun r -> Successful.OK 
-                                  (getSubjectResult g r.query
-                                   |> JsonConvert.SerializeObject))
+          >=> setMimeType "text/json; charset=utf-8"
+          >=> request (fun r -> 
+                match Option.ofChoice (r.query ^^ "uri") with
+                | Some uriStr ->
+                    Successful.OK 
+                      (getSubjectResult g uriStr
+                       |> JsonConvert.SerializeObject)
+                | None -> 
+                    RequestErrors.bad_request ("unknown request variable."B) )
           path "/books" 
+          >=> setMimeType "text/json; charset=utf-8"
           >=> request (fun r -> Successful.OK 
                                   (getBookResult g r.query
                                    |> JsonConvert.SerializeObject))
           path "/browse" // JSON client will get subject and books in ajaxy way?
           >=> setMimeType "text/html; charset=utf-8"
-          >=> request (fun r -> Successful.OK 
-                                  (pageHeader r 
-                                   + SubjectsResult.toHtml 
-                                      (r.url.GetLeftPart(System.UriPartial.Authority))    
-                                      (getSubjectResult g r.query)
-                                   + "<hr>"
-                                   + BooksResult.toHtml (getBookResult g r.query)
-                                   + "</body></html>")) 
+          >=> request (fun r -> 
+                match r.query with
+                // If no query, redirect to the top node.
+                | [] -> 
+                  Redirection.see_other 
+                      (r.url.GetLeftPart(System.UriPartial.Authority) 
+                       + "/browse?uri=" 
+                       + string (g.topNode.uri))
+                | _  -> // TODO: check for variable and well-formed URI here.
+                  match Option.ofChoice (r.query ^^ "uri") with
+                  | Some uriStr -> // TODO: parse System.Uri here and give error if bad.
+                      Successful.OK 
+                        (pageHeader r 
+                         + SubjectsResult.toHtml 
+                           (r.url.GetLeftPart(System.UriPartial.Authority))    
+                           (getSubjectResult g uriStr)
+                         + "<hr>"
+                         + BooksResult.toHtml (getBookResult g r.query)
+                         + "</body></html>")
+                  | None -> 
+                      RequestErrors.bad_request ("unknown request variable."B) )
           path "/searchsubj"
           >=> setMimeType "text/html; charset=utf-8"
-          >=> request (fun r -> Successful.OK
-                                  (pageHeader r
-                                   + "<p><a href=\"" + r.url.GetLeftPart(System.UriPartial.Authority) 
-                                   + "/browse?uri=" 
-                                   + string (g.topNode.uri) + "\">Back to top</a></p>"
-                                   + "<h2>Search result for: " 
-                                   // Maybe I should deal with all the variables here, so the
-                                   // getSubjectSearchResult function can be cleaner.
-                                   + (Option.ofChoice (r.queryParam "searchstr") |? ":empty:")
-                                   // TODO: show the name of the node it's under. Need to return more search info?
-                                   //+ " under: " + (Option.ofChoice (r.queryParam "uri") |? "(top)") + "</h2>"
-                                   + SubjectsResult.infoListToHtml 
-                                        (r.url.GetLeftPart(System.UriPartial.Authority)) 
-                                        (getSubjectSearchResult g r.query)
-                                   + "</body></html>"))
+          >=> request (fun r -> 
+                Successful.OK
+                  (pageHeader r
+                    + "<p><a href=\"" + r.url.GetLeftPart(System.UriPartial.Authority) 
+                    + "/browse?uri=" 
+                    + string (g.topNode.uri) + "\">Back to top</a></p>"
+                    + "<h2>Search result for: " 
+                    // Maybe I should deal with all the variables here, so the
+                    // getSubjectSearchResult function can be cleaner.
+                    + (Option.ofChoice (r.queryParam "searchstr") |? ":empty:")
+                    // TODO: show the name of the node it's under. Need to return more search info?
+                    //+ " under: " + (Option.ofChoice (r.queryParam "uri") |? "(top)") + "</h2>"
+                    + SubjectsResult.infoListToHtml 
+                        (r.url.GetLeftPart(System.UriPartial.Authority)) 
+                        (getSubjectSearchResult g r.query)
+                    + "</body></html>"))
+          path "/"
+          >=> setMimeType "text/html; charset=utf-8"
+          >=> request (fun r ->
+                Successful.OK
+                  ("<html><body>Welcome to the SubjectGraph Web Application.<p />"
+                   + "Entry points:"
+                   + "<ul><li><a href=\"/browse\">/browse</a> : user interface</li>"
+                   + "<li>/subject?uri=... : JSON for subject URI</li>"
+                   + "<li>/books?uri=... : JSON for books under a subject URI</li>"
+                   + "</ul></body></html>"))
       ]
       (* POST >=> choose
         [ path "/hello" >=> Successful.OK "Hello POST"
@@ -339,7 +367,6 @@ let main argv =
                                 listenIPs 
         }
         (dispatch theGraph) //(Successful.OK "Hello, Suave!")
-      printfn "Life exists after dispatch"
       0
   | "update" ->
       // SubjectGraph.buildSerializer()
