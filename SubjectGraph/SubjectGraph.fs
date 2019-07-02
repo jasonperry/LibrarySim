@@ -656,29 +656,40 @@ let hello name =
 
 open System.IO // for file read and write 
 open MBrace.FsPickler
+// open Newtonsoft.Json.Bson
+// open Newtonsoft.Json
 
-/// recreate BiserObjectify serialization code
+(* /// recreate BiserObjectify serialization code
 let buildSerializer () = 
     let serinfo = 
         BiserObjectify.Generator.Run
-            (typeof<int>,true, "./output/biser/", true, false, null)
+            (typeof<SubjectGraph>, true, "./output/biser/", true, false, null)
     printfn "%A" serinfo
+*)
 
 let loadGraph graphFileName = 
-    //let booksFormatter = BinaryFormatter()
+    let instream = File.OpenRead graphFileName
+    (* let bsonReader = new BsonDataReader(instream)
+    let serializer = new JsonSerializer()
+    let graph = serializer.Deserialize<SubjectGraph>(bsonReader) *)
     let serializer = FsPickler.CreateBinarySerializer()
-    let stream = new FileStream(graphFileName, FileMode.Open)
-    let graph = serializer.Deserialize<SubjectGraph>(stream)
-    stream.Close()
+    let graph = serializer.Deserialize<SubjectGraph>(instream)
+    instream.Close()
     graph
 
 let saveGraph (graph: SubjectGraph) graphFileName = 
+    (* let outstream = File.OpenWrite graphFileName
+    let bsonWriter = new BsonDataWriter(outstream)
+    let serializer = new JsonSerializer()
+    let _ = serializer.ReferenceLoopHandling <- ReferenceLoopHandling.Ignore
+    serializer.Serialize(bsonWriter, graph)
+    bsonWriter.Close()
+    outstream.Close() *)
+    let outstream = File.OpenWrite graphFileName
     let serializer = FsPickler.CreateBinarySerializer()
     //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
     graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
-    let pickle = serializer.Pickle(graph)
-    let outfile = File.OpenWrite(graphFileName)
-    //stream.Write(ZeroFormatterSerializer.Serialize(graph), 0, 0)
-    outfile.Write(serializer.Pickle(graph), 0, pickle.Length)
-    // graphFormatter.Serialize(stream, graph)
-    outfile.Close()
+    serializer.Serialize(outstream, graph)
+    (* let pickle = serializer.Pickle(graph)
+    outstream.Write(serializer.Pickle(graph), 0, pickle.Length) *)
+    outstream.Close() 

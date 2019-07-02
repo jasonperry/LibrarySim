@@ -342,7 +342,7 @@ let main argv =
       printfn "Life exists after dispatch"
       0
   | "update" ->
-      SubjectGraph.buildSerializer()
+      // SubjectGraph.buildSerializer()
       0
   | _ -> 
       printfn "Unknown argument: %s" argv.[0]
