@@ -115,9 +115,9 @@ module SubjectsResult =
 
 // TODO: monadize the error handling.  -> WebResult string
 // The ^^ is the "request combinator"
-let getSubjectResult g uriStr = 
+let getSubjectResult g uri = 
       // TODO: error handling
-      SubjectsResult.ofNode g.uriIndex.[System.Uri uriStr]
+      SubjectsResult.ofNode g.uriIndex.[uri]
 
 let getSubjectSearchResult (g : SubjectGraph) q = 
     // printf "Doing search..."
@@ -210,7 +210,18 @@ let pageHeader (r: HttpRequest) =
     // + "<tr><td>" + locationStr + "</td></tr>"
     + "</table><hr>"
 
- 
+/// Look for "uri" variable in query, validate and run the next function if succeeds.
+let withQueryUri query f = 
+    match Option.ofChoice (query ^^ "uri") with
+    | Some uriStr -> // TODO: parse System.Uri here and give error if bad.
+        try
+            let uri = System.Uri uriStr
+            Successful.OK (f uri)
+        with 
+            | :? System.UriFormatException -> 
+              RequestErrors.bad_request ("Malformed query URI."B)
+    | None -> 
+          RequestErrors.bad_request ("Unknown request variable."B)
 
 /// Suave dispatcher for the SubjectGraph web app.
 let dispatch g =
@@ -220,13 +231,9 @@ let dispatch g =
           path "/subject" 
           >=> setMimeType "text/json; charset=utf-8"
           >=> request (fun r -> 
-                match Option.ofChoice (r.query ^^ "uri") with
-                | Some uriStr ->
-                    Successful.OK 
-                      (getSubjectResult g uriStr
-                       |> JsonConvert.SerializeObject)
-                | None -> 
-                    RequestErrors.bad_request ("unknown request variable."B) )
+                withQueryUri r.query (fun uri ->
+                    getSubjectResult g uri
+                    |> JsonConvert.SerializeObject) )
           path "/books" 
           >=> setMimeType "text/json; charset=utf-8"
           >=> request (fun r -> Successful.OK 
@@ -234,7 +241,7 @@ let dispatch g =
                                    |> JsonConvert.SerializeObject))
           path "/browse" // JSON client will get subject and books in ajaxy way?
           >=> setMimeType "text/html; charset=utf-8"
-          >=> request (fun r -> 
+          >=> request (fun r ->  
                 match r.query with
                 // If no query, redirect to the top node.
                 | [] -> 
@@ -242,19 +249,15 @@ let dispatch g =
                       (r.url.GetLeftPart(System.UriPartial.Authority) 
                        + "/browse?uri=" 
                        + string (g.topNode.uri))
-                | _  -> // TODO: check for variable and well-formed URI here.
-                  match Option.ofChoice (r.query ^^ "uri") with
-                  | Some uriStr -> // TODO: parse System.Uri here and give error if bad.
-                      Successful.OK 
-                        (pageHeader r 
-                         + SubjectsResult.toHtml 
-                           (r.url.GetLeftPart(System.UriPartial.Authority))    
-                           (getSubjectResult g uriStr)
-                         + "<hr>"
-                         + BooksResult.toHtml (getBookResult g r.query)
-                         + "</body></html>")
-                  | None -> 
-                      RequestErrors.bad_request ("unknown request variable."B) )
+                | _  -> 
+                  withQueryUri r.query (fun uri ->
+                      (pageHeader r 
+                       + SubjectsResult.toHtml 
+                         (r.url.GetLeftPart(System.UriPartial.Authority))
+                         (getSubjectResult g uri)
+                       + "<hr>"
+                       + BooksResult.toHtml (getBookResult g r.query)
+                       + "</body></html>")) )
           path "/searchsubj"
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> 
@@ -366,7 +369,7 @@ let main argv =
             bindings = List.map (fun ip -> HttpBinding.createSimple HTTP ip appPort) 
                                 listenIPs 
         }
-        (dispatch theGraph) //(Successful.OK "Hello, Suave!")
+        (dispatch theGraph)
       0
   | "update" ->
       // SubjectGraph.buildSerializer()
