@@ -167,23 +167,9 @@ module BooksResult =
 
 // end module BooksResult
 
-/// Return a BookResult object for a URI query.
-let getBookResult (g: SubjectGraph) q = 
-  Option.ofChoice (q ^^ "uri") |? "Unrecognized variable" 
-  |> fun uriStr -> 
-         if uriStr = "top" then // Do I not even use this, just URL 00top
-           {
-               // FIXME: The cnRange setting is a hack, should it be better?
-               thisSubject = {
-                 uri = None; 
-                 cnRange = Some (CNRange.parse "A-ZZ"); 
-                 name = "Top Level";
-                 itemsUnder = g.topNode.booksUnder
-               };
-               books = []
-           }
-         else 
-             BooksResult.ofNode g.uriIndex.[System.Uri uriStr]
+/// Return a BookResult object for a URI.
+let getBookResult (g: SubjectGraph) uri = 
+    BooksResult.ofNode g.uriIndex.[uri]
 
 /// Outputs the header for the SubjectGraph browsing web app.
 let pageHeader (r: HttpRequest) = 
@@ -227,7 +213,7 @@ let withQueryUri query f =
 let dispatch g =
   choose 
     [ GET >=> choose
-        [ // Need to setMimeType "text/html; charset=utf-8"
+        [ 
           path "/subject" 
           >=> setMimeType "text/json; charset=utf-8"
           >=> request (fun r -> 
@@ -236,9 +222,10 @@ let dispatch g =
                     |> JsonConvert.SerializeObject) )
           path "/books" 
           >=> setMimeType "text/json; charset=utf-8"
-          >=> request (fun r -> Successful.OK 
-                                  (getBookResult g r.query
-                                   |> JsonConvert.SerializeObject))
+          >=> request (fun r -> 
+                withQueryUri r.query (fun uri -> 
+                    getBookResult g uri
+                    |> JsonConvert.SerializeObject) )
           path "/browse" // JSON client will get subject and books in ajaxy way?
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r ->  
@@ -256,7 +243,7 @@ let dispatch g =
                          (r.url.GetLeftPart(System.UriPartial.Authority))
                          (getSubjectResult g uri)
                        + "<hr>"
-                       + BooksResult.toHtml (getBookResult g r.query)
+                       + BooksResult.toHtml (getBookResult g uri)
                        + "</body></html>")) )
           path "/searchsubj"
           >=> setMimeType "text/html; charset=utf-8"
