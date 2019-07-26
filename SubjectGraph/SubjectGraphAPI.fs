@@ -14,10 +14,11 @@ open BookTypes
 open CallNumber
 open SubjectGraph
 open MarcXmlToBooks
+open Mods
 open System
 
 // TODO: put these in a configuration file, or get them from the app instance.
-let listenIPs = ["127.0.0.1"] //; "192.168.0.13"]
+let listenIPs = ["0.0.0.0"] // ["127.0.0.1"] //; "192.168.0.13"]
 let appPort = 8080
 
 /// Self-contained info about one graph node, to be directly JSONized 
@@ -147,8 +148,9 @@ module BooksResult =
   let ofNode (node : SubjectNode) = {
     thisSubject = SubjectNode.toSubjectInfo node
     // Sorting assumes there's a call number.
-    books = Seq.sortBy (fun (br : BookRecord) -> br.LCCallNum.Value) node.books
-            |> List.ofSeq
+    books = node.books
+        |> Seq.sortBy (fun (br : BookRecord) -> br.LCCallNum.Value) 
+        |> List.ofSeq
   }
 
   let toHtml (bres : BooksResult) = 
@@ -336,7 +338,7 @@ let main argv =
       printfn "Removed %d nodes; saving minimized graph %s" removed outGraphName
       saveGraph graph outGraphName
       0
-  | "buildGutenBooks" ->
+  | "processBooks" ->
       MarcXmlToBooks.processBooks argv.[1]
       0
   | "buildGutenGraph" ->
@@ -358,9 +360,13 @@ let main argv =
         }
         (dispatch theGraph)
       0
+  // Placeholder for graph or books update, to be added.
   | "update" ->
       // SubjectGraph.buildSerializer()
       0
+  | "mods" ->
+      Mods.test1 ()  
+      0    
   | _ -> 
       printfn "Unknown argument: %s" argv.[0]
       1

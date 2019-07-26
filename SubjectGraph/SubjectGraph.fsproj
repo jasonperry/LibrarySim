@@ -9,12 +9,14 @@
     <Compile Include="Common.fs" />
     <Compile Include="Logger.fs" />
     <Compile Include="MarcXml.fs" />
+    <Compile Include="Mods.fs" />
     <Compile Include="CallNumber.fs" />
     <Compile Include="BookTypes.fs" />
     <Compile Include="SparqlQuery.fs" />
     <Compile Include="SubjectGraph.fs" />
     <Compile Include="BuildTopLevel.fs" />
     <Compile Include="BuildLCClassGraph.fs" />
+    <Compile Include="CatalogQuery.fs"/>
     <Compile Include="BuildFromBooks.fs" />
     <Compile Include="MarcXmlToBooks.fs" />
     <Compile Include="SubjectGraphAPI.fs" />

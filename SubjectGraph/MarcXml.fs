@@ -10,7 +10,7 @@ open FSharp.Data
 let DATADIR = @"./indexdata/"
 [<Literal>]
 let XMLSAMPLE = DATADIR + "MarcRecordSample.xml"
-/// Giving a constant file name initializes the type provider magic.
+/// This type is for a single record, so we can read incrementally.
 type MarcXmlType = XmlProvider<XMLSAMPLE> 
 
 /// Handles both gzipped and uncompressed MarcXml files.
@@ -24,7 +24,7 @@ let getXmlReader filename =
     reader.MoveToContent() |> ignore
     reader  // Oh, but what about closing it?
 
-/// Generator to parse individual MarcXML records from a stream.
+/// Generator to parse individual MarcXML records from a stream
 let getRecordSeq (reader : XmlReader) = 
     seq {
         while (reader.Read()) do

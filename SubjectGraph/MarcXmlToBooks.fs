@@ -23,8 +23,8 @@ open BookTypes
 open CallNumber
 open SubjectGraph
 
-let OUTDIR = @"C:\Users\Jason\code\LibrarySim\SubjectGraph\output\"
-let recordsFileName = OUTDIR + "gutenRecords.brb"
+let OUTDIR = @"./output/"
+let recordsFileName = OUTDIR + "BookRecords.brb"
 
 /// Giving a constant file name initializes the type provider magic.
 // type Marc21Type = XmlProvider<"marcsample.xml"> 
@@ -46,7 +46,7 @@ let log = printfn
                 Some subfield.String.Value
             | _ -> None *)
 
-let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Collection) = 
+let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Collection) = 
     let books = new List<BookRecord>()
     let mutable totalRecords = 0
     let mutable withCallNum = 0
@@ -62,22 +62,26 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
         let mutable lcLetters = None
         let mutable link = None
         let subjects = new List<SubjectInfo>()
+        for controlfield in record.Controlfields do
+            if controlfield.Tag = 0001 then
+                controlNumber <- controlfield.String
         for datafield in record.Datafields do
-            if datafield.Tag = 10 then
+            // Seems more robust to get control number from the control field.
+            (* if datafield.Tag = 10 then
                 controlNumber <- getSingleSubfield datafield "a"
                 // remove the space.
                 match controlNumber with
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
-                | None -> () // TODO: make up one if it's not there (not here, below)
+                | None -> () // TODO: make up one if it's not there (not here, below) *)
             if datafield.Tag = 245 then
                 // "Title Statement found: "
                 title <- getSingleSubfield datafield "a"
                 subtitle <- getSingleSubfield datafield "b"
                 //printfn ": %A - %A" title subtitle
             elif datafield.Tag = 100 then
-                //printf "Primary Author found: " // TODO: dig out more authors
+                printf "Primary Author found: " // TODO: dig out more authors
                 authors <- getSingleSubfield datafield "a"
-                //printfn ": %A" authors
+                printfn ": %A" authors
             // 150 is the topic heading for Marc21 Full. 
             // The gutenberg converter uses 653.
             elif (datafield.Tag = 650 || datafield.Tag = 653)
@@ -98,13 +102,9 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
                 let cn = sfa.Value + (sfb |? "")
                 //printfn "Call Number: %s" cn
                 try 
-                    if cn.StartsWith "YA " then
-                        // Actually, only skips if we skip adding books with no CN below.
-                        printfn "Skipping special collection item %s" cn
-                    else 
-                        lcCallNum <- Some (LCCN.parse cn)
-                        lcLetters <- Some (lcCallNum.Value.letters)
-                        withCallNum <- withCallNum + 1
+                    lcCallNum <- Some (LCCN.parse cn)
+                    lcLetters <- Some (lcCallNum.Value.letters)
+                    withCallNum <- withCallNum + 1
                 with 
                     // If the call number is letters (gutenberg), detect and store.
                     | CallNumberError errorstr -> 
@@ -121,32 +121,32 @@ let processRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Col
         totalRecords <- totalRecords + 1
         if subjects.Count > 0 then
             withSubjects <- withSubjects + 1
-        // Criterion for adding a book: currently that it has a parsed 
-        // call number.
-        if Option.isSome lcCallNum then
+        // Criterion for adding a book: that it has a title.
+        if Option.isSome title then
             printfn "Adding book: %s" title.Value
             books.Add({
-                        Title = title.Value + 
-                                if subtitle.IsSome then (" " + subtitle.Value) else "";
-                        Authors = if authors.IsSome then authors.Value else "" ;
-                        LCCallNum = lcCallNum;
-                        LCLetters = lcLetters;
-                        Subjects = List.ofSeq(subjects);
-                        Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber.Value)
-                        Link = link
+                Title = 
+                    title.Value + 
+                    if Option.isSome subtitle then " " + subtitle.Value else ""
+                Authors = authors |? "" 
+                LCCallNum = lcCallNum
+                LCLetters = lcLetters
+                Subjects = List.ofSeq(subjects)
+                Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber.Value)
+                Link = link
             })
             // For now, only books with subjects.
-    printfn "Processed %d records, %d call numbers, %d subjects," 
+    printfn "Processed %d records, %d parsed call numbers, %d subjects," 
             totalRecords withCallNum withSubjects
     printfn "    %d with Dewey call numbers" withDeweyNum
     printfn "Generated %d book records" books.Count
     books
 
 /// top-level function for the Gutenberg corpus; predates the "master subject
-/// graph" approach.
+/// graph" approach. But bringing it back for catalogQuery.
 let processBooks xmlFilename = 
     // let allbooks = processRecords (Marc21Type.Parse (File.ReadAllText xmlfile))
-    let allbooks = processRecords (getRecordSeq (getXmlReader xmlFilename))
+    let allbooks = processBookRecords (getRecordSeq (getXmlReader xmlFilename))
 
     let formatter = BinaryFormatter()
     let stream = new FileStream(recordsFileName, FileMode.Create)
@@ -157,7 +157,17 @@ let processBooks xmlFilename =
 
 /// top-level function for adding full MARC catalog records to the classification graph.
 let addBooksToClassGraph (graph: SubjectGraph) xmlFilename = 
-    processRecords (getRecordSeq (getXmlReader xmlFilename))
-    |> Seq.filter (fun r -> Option.isSome r.LCCallNum)
+    let skippedCallLetters = [ "YA"; ]
+    processBookRecords (getRecordSeq (getXmlReader xmlFilename))
+    // This is where we can only add books with parsed call numbers.
+    |> Seq.filter 
+        (fun r -> 
+            Option.isSome r.LCCallNum 
+            && 
+            let cnLetters = r.LCCallNum.Value.letters
+            if (List.contains cnLetters skippedCallLetters) then
+                printfn "Skipping special collection item %s" cnLetters
+                false
+            else true)
     |> Seq.iter (fun br -> SubjectGraph.addItemByCallNumber graph br |> ignore)
     ()
