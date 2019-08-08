@@ -106,21 +106,25 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         (*let recEnum = records.GetEnumerator()
         while recEnum.MoveNext() && recordCount < 20000 do 
         let record = recEnum.Current *)
-        let mutable controlNumber = None
+        let mutable controlNumber = null
         let mutable cnRangeStr = None
         let subjectNames = new List<string>()
         let mutable crossRefs = None
         callNumCount <- 0
+        for controlfield in record.Controlfields do
+            if controlfield.Tag = "001" then
+                controlNumber <- controlfield.Value
         for datafield in record.Datafields do
             // Is it always okay to get the control number from the datafield
             //   instead of control field?
-            if datafield.Tag = 10 then
+            (* if datafield.Tag = "10" then
                 controlNumber <- getSingleSubfield datafield "a"
                 // remove the space.
                 match controlNumber with
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
                 | None -> ()
-            if datafield.Tag = 153 then
+            *)
+            if datafield.Tag = "153" then
                 // DELETED: former attempt to use computation expressions
                 // Note: Some have alt call numbers at "c". How to deal? or is it a coding error?
                 let tableField = getSingleSubfield datafield "z" |? ""
@@ -145,7 +149,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 subjectNames.AddRange(getAllSubfields datafield "j")
                 callNumCount <- callNumCount + 1
 
-            if datafield.Tag = 253 then // "See" cross reference
+            if datafield.Tag = "253" then // "See" cross reference
                 let seeAlso = 
                     try
                         Some (parse253 datafield)
@@ -163,7 +167,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
 
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
-            Logger.Error <| "No call number entry (153) or string for record " + controlNumber.Value
+            Logger.Error <| "No call number entry (153) or string for record " + controlNumber
         elif subjectNames.Count > 0 && 
             (subjectNames.[0].StartsWith("Table for") 
              || subjectNames.[0].StartsWith("Table of")
@@ -173,13 +177,13 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
              || subjectNames.[0].StartsWith("Table 3 of")
              || subjectNames.[0].StartsWith("Societies table")) then
             // TODO: just try to parse the CN here, and skip if it fails.
-            Logger.Info <| "Skipping table entry " + (controlNumber |? "")
+            Logger.Info <| "Skipping table entry " + controlNumber
         elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then
-            Logger.Info <| "Skipping 'Learned societies' table for entry " + (controlNumber |? "")
+            Logger.Info <| "Skipping 'Learned societies' table for entry " + controlNumber
         else 
             recordsAdded <- recordsAdded + 1
             insertNode theGraph {
-                uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber.Value);
+                uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber);
                 name = SubjectNode.joinSubjectName (List.ofSeq subjectNames); 
                 subdividedName = List.ofSeq subjectNames;
                 cnString = cnRangeStr; 

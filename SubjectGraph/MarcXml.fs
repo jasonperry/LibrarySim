@@ -9,9 +9,11 @@ open FSharp.Data
 [<Literal>]
 let DATADIR = @"./indexdata/"
 [<Literal>]
-let XMLSAMPLE = DATADIR + "MarcRecordSample.xml"
+// let XMLSAMPLE = DATADIR + "MarcRecordSample.xml" 
+let XMLSAMPLE = DATADIR + "marc-prefix-sample.xml"
 /// This type is for a single record, so we can read incrementally.
-type MarcXmlType = XmlProvider<XMLSAMPLE> 
+//type MarcXmlType = XmlProvider<XMLSAMPLE> 
+type MarcXmlType = XmlProvider<Schema="./indexdata/MARC21slim.xsd.xml">
 
 /// Handles both gzipped and uncompressed MarcXml files.
 let getXmlReader filename =
@@ -30,11 +32,14 @@ let getRecordSeq (reader : XmlReader) =
         while (reader.Read()) do
             if reader.NodeType = XmlNodeType.Element then
                 if reader.Name = "record" then
-                    yield (MarcXmlType.Parse (reader.ReadOuterXml()))
+                    // This gives a "Choice" object, of which "Record" is one
+                    let elt = MarcXmlType.Parse (reader.ReadOuterXml())
+                    match elt.Record with
+                    | Some record -> yield record
+                    | None -> ()
     }
 
 let getSingleSubfield (datafield : MarcXmlType.Datafield) code = 
-    (* Still awkward, but you can't return from a for loop. *)
     match Array.tryFindIndex (fun (sf : MarcXmlType.Subfield) -> 
                                 sf.Code = code)
                                 datafield.Subfields with

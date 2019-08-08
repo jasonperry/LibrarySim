@@ -29,22 +29,6 @@ let recordsFileName = OUTDIR + "BookRecords.brb"
 /// Giving a constant file name initializes the type provider magic.
 // type Marc21Type = XmlProvider<"marcsample.xml"> 
 // it just adds an 's'!
-let log = printfn
-
-// Return the MARC subfield of the given letter, if it exists.
-(* let getSingleSubfield (datafield : Marc21Type.Datafield) code = 
-    // Still awkward, but you can't return from a for loop.
-    match Array.tryFindIndex (fun (sf : Marc21Type.Subfield) -> 
-                              sf.Code.String = Some code)  
-                             datafield.Subfields with
-        | Some i -> Some (datafield.Subfields.[i].String.Value)
-        | None -> None *)
-
-(*    for subfield in datafield.Subfields do
-        match subfield.Code.String with
-            | Some a when a = code -> // Option.Value can throw. 
-                Some subfield.String.Value
-            | _ -> None *)
 
 let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Collection) = 
     let books = new List<BookRecord>()
@@ -54,7 +38,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
     let mutable withSubjects = 0
     for record in records do
         printfn "------ %d ------" totalRecords
-        let mutable controlNumber = None
+        let mutable controlNumber = null // only mandatory field, for now.
         let mutable title = None
         let mutable subtitle = None
         let mutable authors = None 
@@ -63,8 +47,8 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
         let mutable link = None
         let subjects = new List<SubjectInfo>()
         for controlfield in record.Controlfields do
-            if controlfield.Tag = 0001 then
-                controlNumber <- controlfield.String
+            if controlfield.Tag = "001" then
+                controlNumber <- controlfield.Value
         for datafield in record.Datafields do
             // Seems more robust to get control number from the control field.
             (* if datafield.Tag = 10 then
@@ -73,18 +57,18 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 match controlNumber with
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
                 | None -> () // TODO: make up one if it's not there (not here, below) *)
-            if datafield.Tag = 245 then
+            if datafield.Tag = "245" then
                 // "Title Statement found: "
                 title <- getSingleSubfield datafield "a"
                 subtitle <- getSingleSubfield datafield "b"
                 //printfn ": %A - %A" title subtitle
-            elif datafield.Tag = 100 then
+            elif datafield.Tag = "100" then
                 printf "Primary Author found: " // TODO: dig out more authors
                 authors <- getSingleSubfield datafield "a"
                 printfn ": %A" authors
             // 150 is the topic heading for Marc21 Full. 
             // The gutenberg converter uses 653.
-            elif (datafield.Tag = 650 || datafield.Tag = 653)
+            elif (datafield.Tag = "650" || datafield.Tag = "653")
                  && Option.isSome (getSingleSubfield datafield "a")
             then // can be multiples of these
                 let subjName = (getSingleSubfield datafield "a")
@@ -97,7 +81,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                     { name = subjName; cnRange = None; uri = None; itemsUnder = 0})
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
-            elif datafield.Tag = 50 then
+            elif datafield.Tag = "50" then
                 let (sfa, sfb) = (getSingleSubfield datafield "a", getSingleSubfield datafield "b")
                 let cn = sfa.Value + (sfb |? "")
                 //printfn "Call Number: %s" cn
@@ -111,11 +95,11 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                         if LCCN.isCNLetters cn then 
                             lcLetters <- Some cn
                         else printfn "(!!) %s" errorstr
-            elif datafield.Tag = 82 then
+            elif datafield.Tag = "82" then
                 let dcn = getSingleSubfield datafield "a"
                 //printfn "Dewey Call number: %s" dcn.Value
                 withDeweyNum <- withDeweyNum + 1
-            elif datafield.Tag = 856 then
+            elif datafield.Tag = "856" then
                 link <- getSingleSubfield datafield "u"
         // printfn "Subjects: %A" subjects
         totalRecords <- totalRecords + 1
@@ -132,7 +116,8 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 LCCallNum = lcCallNum
                 LCLetters = lcLetters
                 Subjects = List.ofSeq(subjects)
-                Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber.Value)
+                // To be more general, do I only want a URI when I add it to the graph?
+                Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber)
                 Link = link
             })
             // For now, only books with subjects.

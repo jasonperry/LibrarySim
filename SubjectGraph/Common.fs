@@ -1,5 +1,7 @@
 module Common
 
+let log = printfn
+
 let (|?) = defaultArg
 
 /// Apply a function to an option or use a default (from OCaml)
