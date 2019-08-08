@@ -341,6 +341,14 @@ let main argv =
   | "processBooks" ->
       MarcXmlToBooks.processBooks argv.[1]
       0
+  | "printBooks" -> 
+      // TODO: have sort-by command-line options -scl, -scn, etc.
+      Console.OutputEncoding <- System.Text.Encoding.UTF8
+      let books = BookTypes.loadBooks argv.[1]
+      let sortedBooks = BookTypes.sortBooksByCallLetters books
+      for book in sortedBooks do 
+          printfn "%s : %s" (BookRecord.getLCCNString book) book.Title
+      0
   | "buildGutenGraph" ->
       // any way to detect if records.brb is up to date? Not bothering yet!
       BuildFromBooks.buildGraph argv.[1]

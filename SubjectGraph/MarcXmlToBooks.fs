@@ -10,12 +10,11 @@ module MarcXmlToBooks
 // #load "CallNumber.fs"
 // #load "BookRecord.fs" // These are in the built library now. *)
 
-open System.Collections.Generic // Always need this for lists.
+open System.Collections.Generic // Always need this for mutable lists.
 open System.IO // for file read and write 
 open System.IO.Compression
 open System.Xml
 open FSharp.Data
-open System.Runtime.Serialization.Formatters.Binary
 
 open Common
 open MarcXml
@@ -132,15 +131,12 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
 let processBooks xmlFilename = 
     // let allbooks = processRecords (Marc21Type.Parse (File.ReadAllText xmlfile))
     let allbooks = processBookRecords (getRecordSeq (getXmlReader xmlFilename))
-
-    let formatter = BinaryFormatter()
-    let stream = new FileStream(recordsFileName, FileMode.Create)
-    formatter.Serialize(stream, allbooks)
-    stream.Close()
+    BookTypes.saveBooks allbooks recordsFileName
     printfn "Wrote records to file %s" recordsFileName
 
 
 /// top-level function for adding full MARC catalog records to the classification graph.
+/// TODO: Move to SubjectGraph
 let addBooksToClassGraph (graph: SubjectGraph) xmlFilename = 
     let skippedCallLetters = [ "YA"; ]
     processBookRecords (getRecordSeq (getXmlReader xmlFilename))

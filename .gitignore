@@ -218,14 +218,9 @@ _Pvt_Extensions/
 ModelManifest.xml
 
 # Project-specific
-SubjectGraph/graph.sgb
-SubjectGraph/records.brb
-SubjectGraph/topLevelResults.txt
-SubjectGraph/graph.sgb
-SubjectGraph/records.brb
-SubjectGraph/TopLevelIndex.sgb
-SubjectGraph/output
 FableTest/
+SubjectGraph/docs-devel
+SubjectGraph/output
 SubjectGraph/indexdata/TopLevelIndex.csv
 SubjectGraph/logs
 SubjectGraph/indexdata/arizonaLC.xml.gz

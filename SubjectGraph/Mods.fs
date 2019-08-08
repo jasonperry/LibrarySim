@@ -18,7 +18,7 @@ let getModsRecords (queryUrl : string) =
     let records = result.Items.Mods
     records
 
-let modsToBookRecord = 
+let modsToBookRecord = []
 
 let test1 () = 
     let allRecords = getModsRecords (@"https://api.lib.harvard.edu/v2/items?name=schopenhauer&title=fourfold")
