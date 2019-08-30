@@ -60,7 +60,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 // "Title Statement found: "
                 title <- getSingleSubfield datafield "a"
                 subtitle <- getSingleSubfield datafield "b"
-                //printfn ": %A - %A" title subtitle
+                printfn ": %A - %A" title subtitle
             elif datafield.Tag = "100" then
                 printf "Primary Author found: " // TODO: dig out more authors
                 authors <- getSingleSubfield datafield "a"
@@ -80,10 +80,10 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                     { name = subjName; cnRange = None; uri = None; itemsUnder = 0})
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
-            elif datafield.Tag = "50" then
+            elif datafield.Tag = "050" then
                 let (sfa, sfb) = (getSingleSubfield datafield "a", getSingleSubfield datafield "b")
                 let cn = sfa.Value + (sfb |? "")
-                //printfn "Call Number: %s" cn
+                printfn "Call Number: %s" cn
                 try 
                     lcCallNum <- Some (LCCN.parse cn)
                     lcLetters <- Some (lcCallNum.Value.letters)
@@ -126,8 +126,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
     printfn "Generated %d book records" books.Count
     books
 
-/// top-level function for the Gutenberg corpus; predates the "master subject
-/// graph" approach. But bringing it back for catalogQuery.
+/// Parse a Marc21Xml item collection into a list of BookRecords and serialize to disk.
 let processBooks xmlFilename = 
     // let allbooks = processRecords (Marc21Type.Parse (File.ReadAllText xmlfile))
     let allbooks = processBookRecords (getRecordSeq (getXmlReader xmlFilename))
@@ -135,7 +134,7 @@ let processBooks xmlFilename =
     printfn "Wrote records to file %s" recordsFileName
 
 
-/// top-level function for adding full MARC catalog records to the classification graph.
+/// top-level function for parsing MarcXML item records and adding to the graph.
 /// TODO: Move to SubjectGraph
 let addBooksToClassGraph (graph: SubjectGraph) xmlFilename = 
     let skippedCallLetters = [ "YA"; ]

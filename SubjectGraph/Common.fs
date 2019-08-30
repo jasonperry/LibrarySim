@@ -23,4 +23,4 @@ type MaybeBuilder() =
     
     member this.Zero () = None
    
-let maybe = new MaybeBuilder()
+let maybe = MaybeBuilder()

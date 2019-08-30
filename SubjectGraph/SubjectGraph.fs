@@ -388,7 +388,7 @@ module SubjectGraph =
 (* end module SubjectGraph ************************************************ *)
 
 /// Return true if 1st URI is higher in the graph than the 2nd.
-let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 
+let rec isBroaderSubject (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 
     // ? should it accept a node? It should be one-to-one, but...
     let (node1, node2) = graph.uriIndex.[uri1], 
                          graph.uriIndex.[uri2]
@@ -397,7 +397,7 @@ let rec isBroaderThan (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) =
     elif node2.broader.Contains(node1)  then
         true
     else 
-        Seq.exists (fun n -> isBroaderThan graph uri1 n.uri) node2.broader
+        Seq.exists (fun n -> isBroaderSubject graph uri1 n.uri) node2.broader
 
 (******** Stuff below here is old: SPARQL querying functions and CLI. *******)
 
@@ -561,7 +561,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
             Seq.iter updateCounts node.broader
         for node in nodes do
             // Only add a book under a node if there's no narrower one.
-            if not (List.exists (fun n -> isBroaderThan graph node.uri n.uri) nodes) then
+            if not (List.exists (fun n -> isBroaderSubject graph node.uri n.uri) nodes) then
                 printfn "Adding book under node %s" node.name
                 node.books.Add(updatedBook)
                 updateCounts node
@@ -612,7 +612,7 @@ let browseGraphCLI (graph : SubjectGraph) =
                             Seq.iter (fun (book: BookRecord) -> printfn "][ %s" book.Title) *)
                     printfn ""
                     // Print the title before recursing.
-                    if not (currentList.[i].narrower.Count = 0) then
+                    if currentList.[i].narrower.Count <> 0 then
                         printfn "*** Subheadings of %s ***" currentList.[i].name
                     loop currentList.[i]
                 else 
