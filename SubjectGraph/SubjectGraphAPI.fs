@@ -62,15 +62,15 @@ module SubjectsResult =
           nodes
 
   /// make a clickable link to a node's URI.
-  let makeURILink appUrl (uri : System.Uri) text = 
-      "<a href=\"" + appUrl + "/browse?uri=" 
+  let makeURILink (uri : System.Uri) text = 
+      "<a href=\"/browse?uri=" 
       + uri.ToString() + "\">" +  HttpUtility.HtmlEncode(text) 
       + "</a>"
 
-  let subjectInfoToHtml appUrl (si : SubjectInfo) = 
+  let subjectInfoToHtml (si : SubjectInfo) = 
       // TODO: find a way to get the app's own URL...from the config?
       "<td>" + (mapOr CNRange.toString "[NO CN]" si.cnRange) + "</td>"
-      + "<td>" + makeURILink appUrl si.uri.Value 
+      + "<td>" + makeURILink si.uri.Value 
                              (si.name + " (" + string si.itemsUnder + ")")
       + "</td>"
 
@@ -83,7 +83,7 @@ module SubjectsResult =
               "<li>" + 
               match uriOpt with
               | Some uri -> 
-                  makeURILink appUrl uri ((CNRange.toString range) + " " + desc)
+                  makeURILink uri ((CNRange.toString range) + " " + desc)
               | None -> (CNRange.toString range) + " " + desc
               + "</li>"
           )
@@ -94,7 +94,7 @@ module SubjectsResult =
       (if List.isEmpty sr.broader then ""
        else
           "<table><tr><td>Up: </td>" 
-          + (String.concat "</td><td>" (List.map (subjectInfoToHtml appUrl) sr.broader))
+          + (String.concat "</td><td>" (List.map subjectInfoToHtml sr.broader))
           + "</td></tr></table>")
       + "<h2>" + sr.cnRange + " " + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
       //+ "<p>Call number range: " + sr.cnRange + "<br />"
@@ -103,13 +103,13 @@ module SubjectsResult =
          | Some sa -> "<p> <b>Cross references:</b> " + crossrefInfoToHtml appUrl sa + "</p>"
          | None -> ""
       + "</p><table><tr>"
-      + String.concat "</tr><tr>" (List.map (subjectInfoToHtml appUrl) sr.narrower)
+      + String.concat "</tr><tr>" (List.map subjectInfoToHtml sr.narrower)
       + "</tr><table>"
 
-  let infoListToHtml appUrl (infolist : SubjectInfo list) =
+  let infoListToHtml (infolist : SubjectInfo list) =
       "<p>Found " + string (infolist.Length) + " results.</p>"
       + "<table><tr>"
-      + String.concat "</tr><tr>" (List.map (subjectInfoToHtml appUrl) infolist)
+      + String.concat "</tr><tr>" (List.map subjectInfoToHtml infolist)
       + "</tr></table>"
 
 // end module SubjectsResult
@@ -235,9 +235,7 @@ let dispatch g =
                 // If no query, redirect to the top node.
                 | [] -> 
                   Redirection.see_other 
-                      (r.url.GetLeftPart(System.UriPartial.Authority) 
-                       + "/browse?uri=" 
-                       + string (g.topNode.uri))
+                      ("/browse?uri=" + string (g.topNode.uri))
                 | _  -> 
                   withQueryUri r.query (fun uri ->
                       (pageHeader r 
@@ -252,8 +250,7 @@ let dispatch g =
           >=> request (fun r -> 
                 Successful.OK
                   (pageHeader r
-                    + "<p><a href=\"" + r.url.GetLeftPart(System.UriPartial.Authority) 
-                    + "/browse?uri=" 
+                    + "<p><a href=\"/browse?uri=" 
                     + string (g.topNode.uri) + "\">Back to top</a></p>"
                     + "<h2>Search result for: " 
                     // Maybe I should deal with all the variables here, so the
@@ -262,7 +259,6 @@ let dispatch g =
                     // TODO: show the name of the node it's under. Need to return more search info?
                     //+ " under: " + (Option.ofChoice (r.queryParam "uri") |? "(top)") + "</h2>"
                     + SubjectsResult.infoListToHtml 
-                        (r.url.GetLeftPart(System.UriPartial.Authority)) 
                         (getSubjectSearchResult g r.query)
                     + "</body></html>"))
           path "/"
