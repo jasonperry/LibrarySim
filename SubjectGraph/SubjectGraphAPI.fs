@@ -161,7 +161,7 @@ module BooksResult =
         + "</tr><tr><td></td>"
         + match br.Link with 
           | Some link -> "<td><a href=\"" + link + "\">" + link + "</a></td>"
-          | None -> "<td>(no link)</td>"
+          | None -> "<td></td>"
         + "</tr>"
     "<div class=\"booklisting\"><table><tr>"
     + (String.concat "</tr><tr>" (List.map bookfmt bres.books))
@@ -183,7 +183,12 @@ let pageHeader (r: HttpRequest) =
         match (r.queryParam "searchstr") with
         | Choice1Of2 sstr -> false
         | _ -> true
-    "<html><head><title>SubjectGraph Browser</title><head>" 
+    "<html><head><title>SubjectGraph Browser</title>"
+    + "<link href='https://fonts.googleapis.com/css?family=IBM+Plex+Sans&display=swap' rel='stylesheet'>"
+    + "<link href='https://fonts.googleapis.com/css?family=IBM+Plex+Serif&display=swap' rel='stylesheet'>"
+    + "<style>" + System.IO.File.ReadAllText "indexdata/sgweb.css" + "</style>"
+    // + "<link rel='stylesheet' type='text/css' href='indexdata/mystyle.css'>"
+    + "</head>" 
     + "<body><table><tr><td width=60%><h1>SubjectGraph</h1></td>"
     + "<td width=40%>"
     + "<form method=GET action=searchsubj>"
