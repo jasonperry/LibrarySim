@@ -100,17 +100,17 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 withDeweyNum <- withDeweyNum + 1
             elif datafield.Tag = "856" then
                 link <- getSingleSubfield datafield "u"
-        // printfn "Subjects: %A" subjects
+        // endfor (record.Datafields)
         totalRecords <- totalRecords + 1
         if subjects.Count > 0 then
             withSubjects <- withSubjects + 1
         // Criterion for adding a book: that it has a title.
         if Option.isSome title then
             printfn "Adding book: %s" title.Value
+            let trimSlash (s : string) = 
+                if s.EndsWith " /" then s.[0..(s.Length - 3)] else s
             books.Add({
-                Title = 
-                    title.Value + 
-                    if Option.isSome subtitle then " " + subtitle.Value else ""
+                Title = trimSlash title.Value + mapOr trimSlash "" subtitle
                 Authors = authors |? "" 
                 LCCallNum = lcCallNum
                 LCLetters = lcLetters
