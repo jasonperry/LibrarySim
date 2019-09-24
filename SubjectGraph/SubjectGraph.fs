@@ -339,6 +339,7 @@ module SubjectGraph =
 
     /// Shorten long paths by eliminating nodes with one child and no books.
     let contractGraph graph = 
+        let mutable removedCount = 0
         let rec contract' node depth = 
             if node.narrower.Count = 1 && node.books.Count = 0
             then
@@ -350,6 +351,7 @@ module SubjectGraph =
                     parent.narrower.Add(child)
                 child.broader.Remove(node) |> ignore
                 child.broader.AddRange(node.broader)
+                removedCount <- removedCount + 1
                 contract' child (depth+1)
             else
                 // Okay to recurse on a copy, because nodes *at this level*
@@ -357,6 +359,7 @@ module SubjectGraph =
                 let narrowerCopy = new List<_>(node.narrower) // so iteration won't fail.
                 Seq.iter (fun nd -> contract' nd (depth+1)) narrowerCopy
         contract' graph.topNode 0
+        printfn "Contract removed %d nodes" removedCount
 
     /// This step is needed after all nodes are inserted, to find and grab
     /// URI's of the best target node for a cross reference.
