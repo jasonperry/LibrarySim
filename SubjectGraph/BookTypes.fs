@@ -29,6 +29,7 @@ type BookRecord = {
     LCCallNum : LCCN option
     LCLetters: string option
     Subjects: SubjectInfo list
+    Year: int option
     Uri : Uri
     Link: string option
 }

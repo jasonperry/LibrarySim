@@ -29,6 +29,36 @@ let recordsFileName = OUTDIR + "BookRecords.brb"
 // type Marc21Type = XmlProvider<"marcsample.xml"> 
 // it just adds an 's'!
 
+/// Find the first 4-digit year in a string from MARC field 260 subfield c.
+let extract260cYear (field: string) = 
+    let mutable starti = 0
+    while starti < field.Length && not (System.Char.IsDigit field.[starti]) do
+        starti <- starti + 1
+    let mutable endi = starti
+    while endi < field.Length && System.Char.IsDigit field.[endi] do
+        endi <- endi + 1
+    if endi - starti = 4 then
+        Some (int field.[starti..endi-1])
+    else
+        None
+
+// (Tail-)recursive version.
+(*let extract260cYear (field: string) = 
+    // I wrote a mutating version and it was harder to make correct!
+    let rec extr acc i = 
+        if i = field.Length then acc
+        elif System.Char.IsDigit field.[i] then
+            extr (acc + string field.[i]) (i+1)
+        else
+            if acc.Length > 0 then acc
+            else extr acc (i+1)
+    let yearstr = extr "" 0
+    if yearstr.Length = 4 then
+        Some (int yearstr)
+    else
+        None
+*)
+
 let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type.Collection) = 
     let books = new List<BookRecord>()
     let mutable totalRecords = 0
@@ -43,6 +73,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
         let mutable authors = None 
         let mutable lcCallNum = None
         let mutable lcLetters = None
+        let mutable year = None
         let mutable link = None
         let subjects = new List<SubjectInfo>()
         for controlfield in record.Controlfields do
@@ -55,7 +86,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 // remove the space.
                 match controlNumber with
                 | Some s -> controlNumber <- Some (s.Replace (" ", ""))
-                | None -> () // TODO: make up one if it's not there (not here, below) *)
+                | None -> () *)
             if datafield.Tag = "245" then
                 // "Title Statement found: "
                 title <- getSingleSubfield datafield "a"
@@ -65,6 +96,11 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 printf "Primary Author found: " // TODO: dig out more authors
                 authors <- getSingleSubfield datafield "a"
                 printfn ": %A" authors
+            elif datafield.Tag = "260" then
+                match getSingleSubfield datafield "c" with
+                | Some fieldstr -> 
+                    year <- extract260cYear fieldstr 
+                | None -> ()
             // 150 is the topic heading for Marc21 Full. 
             // The gutenberg converter uses 653.
             elif (datafield.Tag = "650" || datafield.Tag = "653")
@@ -110,10 +146,15 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
             let trimSlash (s : string) = 
                 if s.EndsWith " /" then s.[0..(s.Length - 3)] else s
             books.Add({
-                Title = trimSlash title.Value + mapOr trimSlash "" subtitle
+                Title = trimSlash title.Value + 
+                        (match subtitle with 
+                         | Some st -> " " + trimSlash st
+                         | None -> ""
+                        )
                 Authors = authors |? "" 
                 LCCallNum = lcCallNum
                 LCLetters = lcLetters
+                Year = year
                 Subjects = List.ofSeq(subjects)
                 // To be more general, do I only want a URI when I add it to the graph?
                 Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber)

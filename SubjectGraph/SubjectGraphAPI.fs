@@ -158,7 +158,7 @@ module BooksResult =
         "<td>" + (mapOr LCCN.toString "" br.LCCallNum) + "</td>"
         + "<td><b>" + HttpUtility.HtmlEncode(br.Title) + "</b></td>"
         + "<td>" + HttpUtility.HtmlEncode(br.Authors) + "</td>"
-        + "</tr><tr><td></td>"
+        + "</tr><tr><td>" + mapOr string "" br.Year + "</td>"
         + match br.Link with 
           | Some link -> "<td><a href=\"" + link + "\">" + link + "</a></td>"
           | None -> "<td></td>"
