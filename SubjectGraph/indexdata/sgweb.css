@@ -1,8 +1,23 @@
 
 h1,h2,h3 {
-    font-family: sans-serif;
+    font-family: serif;
     font-weight: normal;
 }
 body {
-    font-family: serif;
+    font-family: sans-serif;
+}
+table {
+    border-collapse: collapse;
+}
+tr.bookend {
+    border-bottom: 1px solid #ccc;
+}
+tr.bookend td {
+    padding-bottom: 10px;
+}
+.booklisting tr{
+    width: 600px; /* no work */
+}
+td {
+    padding-right: 10px;
 }
