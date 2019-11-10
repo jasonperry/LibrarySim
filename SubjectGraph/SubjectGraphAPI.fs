@@ -19,7 +19,7 @@ open System
 
 // TODO: put these in a configuration file, or get them from the app instance.
 let listenIPs = ["0.0.0.0"] // ["127.0.0.1"] //; "192.168.0.13"]
-let appPort = 8080
+let appPort = 8999
 
 /// Self-contained info about one graph node, to be directly JSONized 
 ///   and sent to the browser.
