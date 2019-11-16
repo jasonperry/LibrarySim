@@ -299,7 +299,7 @@ module SubjectGraph =
         match newNode.callNumRange with 
             | Some cn -> 
                 if graph.cnIndex.ContainsKey cn then
-                    printfn "[Warning] Overwriting existing subject for CN range %s" (CNRange.toString cn)
+                    Logger.Warning "Overwriting existing CN index entry for range %s" (CNRange.toString cn)
                     // graph.cnIndex.[cn] <- newNode :: graph.cnIndex.[cn]
                 graph.cnIndex.[cn] <- newNode
             | None -> ()
@@ -407,7 +407,7 @@ let getBroaderTerms (subj : Uri) =
         + "    ?broader madsrdf:authoritativeLabel ?label .\n"
         + "} LIMIT 10 \n"
         // and general collection?
-    Logger.Debug queryString
+    Logger.Debug "Issued SPARQL query: %s" queryString
     let res = sparqlQuery queryString
     [ for bindings in res.results -> (bindings.["broader"], bindings.["label"]) ]
     // List.map (fun (k : Map<string,string>) -> "<" + k.["broader"] + ">") res.results
@@ -419,7 +419,7 @@ let getNarrowerTerms (subj : Uri) =
         +      "<" + subj.ToString() + "> madsrdf:hasNarrowerAuthority ?narrower .\n"
         + "    ?narrower madsrdf:isMemberOfMADSCollection lcsh:collection_LCSH_General \n"
         + "} LIMIT 200 \n"
-    Logger.Debug queryString
+    Logger.Debug "Issued SPARQL query: %s" queryString
     let res = sparqlQuery queryString
     (* thought: should I use the subject URI as my unique ID also? *)
     [ for bindings in res.results -> bindings.["broader"] ]
@@ -435,7 +435,7 @@ let querySubjectData (label: string) =
         + "BIND(EXISTS{?subj rdf:type madsrdf:ComplexSubject} AS ?complex) .\n"
         + "OPTIONAL { ?subj madsrdf:classification ?callNum }\n"
         + "} LIMIT 25\n" 
-    Logger.Debug queryString
+    Logger.Debug "Issued SPARQL query: %s" queryString
     sparqlQuery queryString
 
 /// Attempt to retrieve a subject heading identifier for a subject label.
@@ -475,15 +475,15 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
     let qres = querySubjectData label  
     // 2. Handle two cases where the subject can already be in the graph.
     if (not qres.results.IsEmpty) && graph.uriIndex.ContainsKey (Uri qres.results.[0].["subj"]) then
-        Logger.Info <| "Subject " + label + " already in graph"
+        Logger.Info "Subject %s already in graph" label
         Some graph.uriIndex.[Uri qres.results.[0].["subj"]]
     elif qres.results.IsEmpty && graph.subjectNameIndex.ContainsKey label then
         // TODO: if multiple matches, disambiguate by call number.
-        Logger.Info <| "Subject label " + label + " already in graph"
+        Logger.Info "Subject label %s already in graph" label
         Some graph.subjectNameIndex.[label].[0] // bookAdd worries about being broader?
     // 3. Build a new node.
     else 
-        Logger.Info <| "Building new subject node for " + label
+        Logger.Info "Building new subject node for %s" label
         let subdividedName = SubjectNode.splitSubjectName label
         // Make a URI for the subject, either from LCSH or our own generation scheme.
         let uri = 
@@ -491,7 +491,7 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
                 Uri qres.results.[0].["subj"]
             else 
                 // I'd like to have a count of how many weren't found in LCSH...
-                Logger.Info <| "Subject label " + label + " not found in LCSH"
+                Logger.Info "Subject label %s not found in LCSH" label
                 newSubjectUri graph label callLetters
         let cnString = 
             if (not qres.results.IsEmpty) && qres.results.[0].ContainsKey "callNum" then 
@@ -543,7 +543,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
     let nodes = book.Subjects
                 |> List.map (fun subj -> addSubjectLCSH graph subj.name book.LCLetters) 
                 |> List.choose id
-    Logger.Info <| "Finished adding subjects for book \"" + book.Title + "\""
+    Logger.Info "Finished adding subjects for book \"%s\"" book.Title
     // If we're storing books too, add it and update the counts
     if addBook then
         // Add URIs for the found subjects to the book record.
@@ -562,7 +562,7 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
                 node.books.Add(updatedBook)
                 updateCounts node
     if nodes.IsEmpty then
-        Logger.Alert (sprintf "No subject found for \"%s\"; book not added" book.Title)
+        Logger.Warning "No subject found for \"%s\"; book not added" book.Title
         false
     else true
 

@@ -73,12 +73,11 @@ let parse253 (datafield: MarcXmlType.Datafield) : CrossrefInfo =
                                     else LCCN.parse cnEndStr
                         Some {startCN=startCN; endCN=endCN}
                     with CallNumberError errstr -> 
-                        printfn "[ERROR] CallNumberError in field 253: %s" errstr
+                        Logger.Error "CallNumberError in field 253: %s" errstr
                         None
                 (sfi.Value, cnRange, None) :: scanSubfields ()
-            | _ -> // FIXME: should detect an "i" or "z" here and do the right thing.
-                printfn "[WARNING] Unknown 253 subfield code: %s" sfi.Code
-                //Logger.Warning ("Unknown 253 subfield code: " ^ sfi.Code)
+            | _ -> 
+                Logger.Warning "Unknown 253 subfield code %s, value: %s" sfi.Code sfi.Value
                 i <- i + 1
                 (sfi.Value, None, None) :: scanSubfields ()
     scanSubfields () // Caller should log error if empty.
@@ -89,7 +88,7 @@ let insertNode (graph: SubjectGraph) node =
     match npIndex.FindExact(node.subdividedName) with 
         | Some exactMatch -> 
             // Should this be done in the SubjectGraph insert code?
-            printfn "Subject %A already in index" node.name 
+            Logger.Info "Subject %A already in index" node.name 
             exactMatch
         | None -> 
             match node.callNumRange with
@@ -97,7 +96,7 @@ let insertNode (graph: SubjectGraph) node =
                 let isNarrower = fun n1 n2 -> CNRange.isSubRange n1.callNumRange.Value n2.callNumRange.Value
                 SubjectGraph.insertNode isNarrower graph node 
             | None -> 
-                printfn "No call number for %s, not inserting (for now)" node.name
+                Logger.Warning "No call number for %s, not inserting (for now)" node.name
             node
 
 /// Create a whole sequence of SubjectNode objects and insert them with 
@@ -160,25 +159,12 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 crossRefs <- parse253 datafield
                 if not crossRefs.IsEmpty then
                     // Possible to get 253 without 153? 
-                    printfn "[INFO]: Got 'see also' info for %A" cnRangeStr
+                    Logger.Info "Got 'see also' info for %A" cnRangeStr
                     crossRefCount <- crossRefCount + 1
-                    (*try
-                        Some (parse253 datafield)
-                    with CallNumberError errstr -> 
-                        printfn "CallNumberError in field 253: %s" errstr
-                        None
-                // DEBUG: May remove this check if it never happens.
-                if Option.isSome seeAlso && seeAlso.Value.desc = "" && seeAlso.Value.refs.IsEmpty then
-                    printfn "Warning: empty 'see' data for %A; not adding" controlNumber
-                else 
-                    if Option.isSome cnRangeStr then
-                        printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
-                        crossRefCount <- crossRefCount + 1
-                    crossRefs <- seeAlso *)
-
+        // End of field detection, filter out and assemble the record.
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
-            Logger.Error <| "No call number entry (153) or string for record " + controlNumber
+            Logger.Error "No call number entry (153) or string for record %s" controlNumber
         elif subjectNames.Count > 0 && 
             (subjectNames.[0].StartsWith("Table for") 
              || subjectNames.[0].StartsWith("Table of")
@@ -188,9 +174,9 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
              || subjectNames.[0].StartsWith("Table 3 of")
              || subjectNames.[0].StartsWith("Societies table")) then
             // TODO: just try to parse the CN here, and skip if it fails.
-            Logger.Info <| "Skipping table entry " + controlNumber
+            Logger.Info "Skipping table entry %s" controlNumber
         elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then
-            Logger.Info <| "Skipping 'Learned societies' table for entry " + controlNumber
+            Logger.Info "Skipping 'Learned societies' table for entry %s" controlNumber
         else 
             recordsAdded <- recordsAdded + 1
             insertNode theGraph {
@@ -205,7 +191,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                             Some (CNRange.parse rstr)
                         with
                         | CallNumberError errstr -> 
-                            printfn "Error with CNRange #%d: %s" recordCount errstr 
+                            Logger.Error "CNRange #%d: %s" recordCount errstr 
                             None
                     | None -> None
                     ;
@@ -220,11 +206,10 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
             |> ignore *)
         recordCount <- recordCount + 1
         if recordCount % 1111 = 0 then 
-            printfn "============= %d\n" recordCount
-            // printfn "============= %d\n%A\n" recordCount subjectNames
+            Logger.Debug "============= %d\n" recordCount
     printfn "Processed %d records"  recordCount 
     printfn "          %d with no call numbers" withNoCallNum
-    printfn "          %d with cross-refs and CNs" crossRefCount
+    printfn "          %d with cross-refs" crossRefCount
     printfn "          %d added to graph" recordsAdded
     theGraph
 
@@ -239,12 +224,7 @@ let buildGraph filename outputGraphFileName =
         reader.Close()
         printfn "Resolving Cross-reference links..."
         SubjectGraph.updateCrossrefs theGraph
-        // instream.Close()
-        // desperate attempt to reclaim memory before serialization.
-        // ...now not needed? I found a better pickler.
-        // npIndex.Clear()
-        // System.GC.Collect()
         saveGraph theGraph outputGraphFileName
         printfn "Class graph saved to %s" outputGraphFileName
-    with 
-        | CallNumberError msg -> printfn "CallNumberError: %s" msg
+    with // Aren't these caught above?
+        | CallNumberError msg -> Logger.Error "CallNumberError: %s" msg

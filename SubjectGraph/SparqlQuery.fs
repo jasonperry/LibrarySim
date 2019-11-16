@@ -61,6 +61,6 @@ let sparqlQuery (queryString : string) =
         SparqlResult.FromXml (reader.ReadToEnd())
     with 
     | ex -> 
-        Logger.Error <| "SPARQL Query failed with: " + ex.Message
+        Logger.Error "SPARQL Query failed with: %s" ex.Message
         SparqlResult.Empty
 
