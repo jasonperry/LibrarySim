@@ -32,49 +32,56 @@ let npIndex = NamePrefixIndex.Create()
 
 /// Parse all subfields of "See also" and create a CrossRefInfo object. 
 /// TODO: function like this for 153 also (there can be multiple call numbers)
-let parse253 (datafield: MarcXmlType.Datafield) = 
-    let mutable desc =
+let parse253 (datafield: MarcXmlType.Datafield) : CrossrefInfo = 
+    (* let mutable desc =
         if datafield.Subfields.[0].Code = "i" then
             datafield.Subfields.[0].Value
-        else ""
-    let mutable i = if desc = "" then 0 else 1
+        else "" *)
+    let trimPunctuation (sfs : string) = 
+        // TODO: strip parens also.
+        // Order is important, there's '+,' in the data.
+        if sfs.IndexOf ";" <> -1 then // when are there these? 
+            sfs.[0..(sfs.IndexOf ";" - 1)]
+        elif sfs.IndexOf "+" <> -1 then 
+            sfs.[0..(sfs.IndexOf "+" - 1)]
+        elif sfs.IndexOf "," <> -1 then 
+            sfs.[0..(sfs.IndexOf "," - 1)]
+        else sfs
+    let mutable i = 0 
     let rec scanSubfields () =
         if i >= datafield.Subfields.Length then
             []
         else
             let sfi = datafield.Subfields.[i]
             match sfi.Code with
+            | "i" -> 
+                i <- i+1
+                (sfi.Value, None, None) :: scanSubfields ()
             | "a" -> 
-                let cnStartStr = 
-                    if sfi.Value.EndsWith(";") || sfi.Value.EndsWith(",") || sfi.Value.EndsWith("+")
-                    then sfi.Value.[0..(sfi.Value.Length - 2)]
-                    else sfi.Value
+                let cnStartStr = trimPunctuation sfi.Value
                 let cnEndStr = 
+                    // Look for a following field "c", grab it and move the pointer.
                     if datafield.Subfields.Length > i+1 && datafield.Subfields.[i+1].Code = "c" then
                         i <- i+1 
-                        if datafield.Subfields.[i].Value.EndsWith(";") 
-                           || datafield.Subfields.[i].Value.EndsWith(",") 
-                           || datafield.Subfields.[i].Value.EndsWith("+")
-                        then datafield.Subfields.[i].Value.[0..(datafield.Subfields.[i].Value.Length - 2)]
-                        else datafield.Subfields.[i].Value
-                    else ""
-                let desc = 
-                    if datafield.Subfields.Length > i+1 && datafield.Subfields.[i+1].Code = "i" then
-                        i <- i + 1
-                        datafield.Subfields.[i].Value
+                        trimPunctuation datafield.Subfields.[i].Value
                     else ""
                 i <- i + 1
-                // parsing exceptions shoud be caught by caller.
-                let parsedStart = LCCN.parse cnStartStr
-                ({startCN = parsedStart; 
-                    endCN = if cnEndStr = "" then parsedStart else LCCN.parse cnEndStr}, 
-                 desc, None) :: scanSubfields ()
+                let cnRange = 
+                    try
+                        let startCN = LCCN.parse cnStartStr
+                        let endCN = if cnEndStr = "" then startCN 
+                                    else LCCN.parse cnEndStr
+                        Some {startCN=startCN; endCN=endCN}
+                    with CallNumberError errstr -> 
+                        printfn "[ERROR] CallNumberError in field 253: %s" errstr
+                        None
+                (sfi.Value, cnRange, None) :: scanSubfields ()
             | _ -> // FIXME: should detect an "i" or "z" here and do the right thing.
-                printfn "Expected 253 subfield code 'a', got '%s'" sfi.Code
-                desc <- desc + ". " + sfi.Value
+                printfn "[WARNING] Unknown 253 subfield code: %s" sfi.Code
+                //Logger.Warning ("Unknown 253 subfield code: " ^ sfi.Code)
                 i <- i + 1
-                scanSubfields ()
-    { desc = desc; refs = scanSubfields () } // Caller should log error if empty.
+                (sfi.Value, None, None) :: scanSubfields ()
+    scanSubfields () // Caller should log error if empty.
 
 /// Add node to graph by calling SubjectGraph.insertNode with the 
 /// CNRange comparison function. 
@@ -109,7 +116,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         let mutable controlNumber = null
         let mutable cnRangeStr = None
         let subjectNames = new List<string>()
-        let mutable crossRefs = None
+        let mutable crossRefs = []
         callNumCount <- 0
         for controlfield in record.Controlfields do
             if controlfield.Tag = "001" then
@@ -150,8 +157,12 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 callNumCount <- callNumCount + 1
 
             if datafield.Tag = "253" then // "See" cross reference
-                let seeAlso = 
-                    try
+                crossRefs <- parse253 datafield
+                if not crossRefs.IsEmpty then
+                    // Possible to get 253 without 153? 
+                    printfn "[INFO]: Got 'see also' info for %A" cnRangeStr
+                    crossRefCount <- crossRefCount + 1
+                    (*try
                         Some (parse253 datafield)
                     with CallNumberError errstr -> 
                         printfn "CallNumberError in field 253: %s" errstr
@@ -163,7 +174,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                     if Option.isSome cnRangeStr then
                         printfn "[INFO]: Got 'see also' info for %s" cnRangeStr.Value
                         crossRefCount <- crossRefCount + 1
-                    crossRefs <- seeAlso
+                    crossRefs <- seeAlso *)
 
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
@@ -226,7 +237,7 @@ let buildGraph filename outputGraphFileName =
         // SubjectGraph.makeTopLevel theGraph // mutates; guess it should be OO.
         // printfn "** Nodes in Top Level: %d" theGraph.topLevel.Count
         reader.Close()
-        printfn "Updating Cross-references..."
+        printfn "Resolving Cross-reference links..."
         SubjectGraph.updateCrossrefs theGraph
         // instream.Close()
         // desperate attempt to reclaim memory before serialization.

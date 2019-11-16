@@ -9,13 +9,10 @@ open BookTypes
 open CallNumber
 open SparqlQuery
 
-/// Where to put this? Either in common or NamePrefixIndex.
-/// Return true if list1 is a strict prefix of list2 (not equal).
-let rec isStrictPrefix list1 list2 = 
-    match (list1, list2) with
-        | (_, []) -> false
-        | ([], y::ys) -> true
-        | (x::xs, y::ys) -> x = y && isStrictPrefix xs ys
+
+/// Cross-reference information list for a subject node.
+/// TODO: Maybe move to SubjectGraph.
+type CrossrefInfo = (string * LCCNRange option * System.Uri option) list
 
 type SubjectNode = {
     uri : Uri;
@@ -26,7 +23,7 @@ type SubjectNode = {
     // I thought it was clever that the upwards are immutable and the downwards aren't. 
     broader : List<SubjectNode>; // SubjectNode list;  So sad, had to make it mutable...
     narrower : List<SubjectNode>; // mutable; new parents not added, but children are
-    seeAlso: CrossrefInfo option;
+    mutable seeAlso: CrossrefInfo;
     books : List<BookRecord>;
     mutable booksUnder : int  // to keep a count
 }
@@ -112,7 +109,7 @@ type NamePrefixIndex = private {
                     for nodej in childList do  // checks both directions
                         if isStrictPrefix nodei.subdividedName nodej.subdividedName then
                             toRemove.Add nodej
-                Seq.iter (fun (nd : SubjectNode) -> ignore (childList.Remove nd)) 
+                Seq.iter (childList.Remove >> ignore) 
                          toRemove
                 List.ofSeq childList
 
@@ -184,7 +181,7 @@ module SubjectGraph =
             cnString = Some "A-ZZ"; // just as a backup
             broader = new List<SubjectNode>(); // formerly SubjectNode list
             narrower = new List<SubjectNode>(); 
-            seeAlso = None;
+            seeAlso = [];
             books = new List<BookRecord>();
             booksUnder = 0  // to keep a count
         }
@@ -257,8 +254,8 @@ module SubjectGraph =
         let rec search' fromnode = 
             if fromnode.name.ToLower().Contains searchStr then [fromnode]
             else 
-                Seq.map search' fromnode.narrower
-                |> Seq.concat |> Seq.toList
+                Seq.collect search' fromnode.narrower
+                |>  Seq.toList
         search' graph.uriIndex.[startURI] // need exception handling? here?
 
     /// Totally awesome, perfect, clear, generic node insertion function.
@@ -292,7 +289,7 @@ module SubjectGraph =
                     (atnode, [])
         let (parent, oldchildren) = insert graph.topNode
         // Remove children from grandparent node (couldn't modify atnode in the let rec)
-        List.iter (fun child -> parent.narrower.Remove child |> ignore) oldchildren
+        List.iter (parent.narrower.Remove >> ignore) oldchildren
         // Oops, I forgot to add as a child of the parent!
         parent.narrower.Add newNode
         // Add to the indexes. 
@@ -325,10 +322,9 @@ module SubjectGraph =
     let collapseGraph graph thresh = 
         // Return a list of all items below a list of nodes.
         let rec harvestItems nodelist = 
-            Seq.concat 
-                (Seq.map 
-                    (fun nd -> Seq.append nd.books (harvestItems nd.narrower)) 
-                    nodelist)
+            Seq.collect
+                (fun nd -> Seq.append nd.books (harvestItems nd.narrower)) 
+                nodelist
         let rec collapse' node = 
             if node.booksUnder < thresh then
                 node.books.AddRange(harvestItems node.narrower)
@@ -365,18 +361,15 @@ module SubjectGraph =
     /// URI's of the best target node for a cross reference.
     let updateCrossrefs graph = 
         let rec update' atnode = 
-            match atnode.seeAlso with
-            | Some crinfo -> 
-                let rec genlist' crlist = 
-                    match crlist with
-                    | (range, desc, Some uri) :: rest -> 
-                        (range, desc, Some uri) :: genlist' rest
-                    | (range, desc, None) :: rest -> 
-                        let uri = (findCNRange graph range).uri
-                        (range, desc, Some uri) :: genlist' rest
-                    | [] -> []
-                crinfo.refs <- genlist' crinfo.refs
-            | None -> ()
+            let rec genlist' crlist = 
+                match crlist with
+                | (desc, Some cnRange, None) :: rest -> 
+                    let uri = (findCNRange graph cnRange).uri
+                    (desc, Some cnRange, Some uri) :: genlist' rest
+                | entry :: rest -> 
+                    entry :: genlist' rest
+                | [] -> []
+            atnode.seeAlso <- genlist' atnode.seeAlso
             Seq.iter update' atnode.narrower
         update' graph.topNode
                    
@@ -516,7 +509,7 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
                     None
             broader = new List<SubjectNode>(); // (parents);
             narrower = new List<SubjectNode>(); //(children); 
-            seeAlso = None;
+            seeAlso = [];
             books = new List<BookRecord>();
             booksUnder = 0
         }

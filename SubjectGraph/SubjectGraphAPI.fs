@@ -29,7 +29,7 @@ type SubjectsResult = {
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
   cnRange : string;
-  seeAlso: CrossrefInfo option
+  seeAlso: CrossrefInfo
 }
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
@@ -75,20 +75,16 @@ module SubjectsResult =
       + "</td>"
 
   let crossrefInfoToHtml appUrl (cr : CrossrefInfo) = 
-    cr.desc + ":<br/><bl>" 
-    + (cr.refs 
-       |> List.map 
-          // Fails on graph with unresolved cross-ref
-          (fun (range, desc, uriOpt) -> 
-              "<li>" + 
-              match uriOpt with
-              | Some uri -> 
-                  makeURILink uri ((CNRange.toString range) + " " + desc)
-              | None -> (CNRange.toString range) + " " + desc
-              + "</li>"
-          )
-       |> String.concat "<br/>")
-    + "</bl>"
+    (cr
+    |> List.map 
+        (fun (desc, range, uriOpt) -> 
+            // "<li>" + 
+            match uriOpt with
+              | Some uri -> makeURILink uri desc
+              | None -> desc )
+            // + "</li>" )
+    |> String.concat "<br/>")
+    // + "</bl>"
 
   let toHtml appUrl (sr : SubjectsResult) = 
       (if List.isEmpty sr.broader then ""
@@ -100,8 +96,8 @@ module SubjectsResult =
       //+ "<p>Call number range: " + sr.cnRange + "<br />"
       + "<p>Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       +  match sr.seeAlso with 
-         | Some sa -> "<p> <b>Cross references:</b> " + crossrefInfoToHtml appUrl sa + "</p>"
-         | None -> ""
+         | [] -> ""
+         | sa -> "<p> <b>Cross references:</b><br/>" + crossrefInfoToHtml appUrl sa + "</p>"
       + "</p><table><tr>"
       + String.concat "</tr><tr>" (List.map subjectInfoToHtml sr.narrower)
       + "</tr><table>"

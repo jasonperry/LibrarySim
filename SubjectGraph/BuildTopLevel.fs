@@ -54,7 +54,7 @@ let buildGraph () =
             // Don't need to add parents manually, done by call number!
             broader = new List<_>(); // (List.map (fun u -> theGraph.uriIndex.[System.Uri u]) parents)
             narrower = new List<SubjectNode>();
-            seeAlso = None;
+            seeAlso = [];
             books = new List<BookRecord>();
             booksUnder = 0
         }
