@@ -138,7 +138,7 @@ let getSubjectSearchResult (g : SubjectGraph) q =
 
 /// Transmission type of all books under a SubjectNode.
 type BooksResult = {
-  thisSubject : SubjectInfo; // list? Yes!
+  thisSubject : SubjectInfo; // TODO? list for multiple subjects
   // broader : SubjectInfo list; // Don't need, can just move up from the subject.
   // can view all books under but it gives you chunks!
   books : BookRecord list
@@ -158,9 +158,9 @@ module BooksResult =
         "<td>" + (mapOr LCCN.toString "" br.LCCallNum) + "</td>"
         + "<td><b>" + HttpUtility.HtmlEncode(br.Title) + "</b></td>"
         + "<td>" + HttpUtility.HtmlEncode(br.Authors) + "</td>"
-        + "</tr><tr><td>" + mapOr string "" br.Year + "</td>"
+        + "</tr><tr class=\"bookend\"><td>" + mapOr string "" br.Year + "</td>"
         + match br.Link with 
-          | Some link -> "<td><a href=\"" + link + "\">" + link + "</a></td>"
+          | Some link -> "<td><a href=\"" + link + "\" target=\"_blank\">" + link + "</a></td>"
           | None -> "<td></td>"
         + "</tr>"
     "<div class=\"booklisting\"><table><tr>"
@@ -178,7 +178,7 @@ let pageHeader (r: HttpRequest) =
     let uriStr = 
         match (r.queryParam "uri") with
         | Choice1Of2 uri -> uri
-        | _ -> "SHOULDN'T HAPPEN"
+        | _ -> "SHOULD NOT HAPPEN"
     let atNode = 
         match (r.queryParam "searchstr") with
         | Choice1Of2 sstr -> false
@@ -189,7 +189,7 @@ let pageHeader (r: HttpRequest) =
     + "<style>" + System.IO.File.ReadAllText "indexdata/sgweb.css" + "</style>"
     // + "<link rel='stylesheet' type='text/css' href='indexdata/mystyle.css'>"
     + "</head>" 
-    + "<body><table><tr><td width=60%><h1>SubjectGraph</h1></td>"
+    + "<body><table style=\"width:100%\"><tr><td width=60%><h1>SubjectGraph</h1></td>"
     + "<td width=40%>"
     + "<form method=GET action=searchsubj>"
     + "<input type=TEXT name=searchstr>Search</input>"
