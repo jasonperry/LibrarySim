@@ -118,42 +118,27 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         let mutable crossRefs = []
         callNumCount <- 0
         for controlfield in record.Controlfields do
+            // Is it always okay to get the control number from the datafield
+            //   instead of control field? (datafield code removed)
             if controlfield.Tag = "001" then
                 controlNumber <- controlfield.Value
         for datafield in record.Datafields do
-            // Is it always okay to get the control number from the datafield
-            //   instead of control field?
-            (* if datafield.Tag = "10" then
-                controlNumber <- getSingleSubfield datafield "a"
-                // remove the space.
-                match controlNumber with
-                | Some s -> controlNumber <- Some (s.Replace (" ", ""))
-                | None -> ()
-            *)
             if datafield.Tag = "153" then
                 // DELETED: former attempt to use computation expressions
                 // Note: Some have alt call numbers at "c". How to deal? or is it a coding error?
-                let tableField = getSingleSubfield datafield "z" |? ""
-                let lcCallNumStart = // Option.lift2 (+) tableField (getSingleSubfield datafield "a")
-                    match getSingleSubfield datafield "a" with 
-                    | None -> None
-                    | Some _ when tableField.Contains("-") -> None
-                    | Some a -> Some (tableField + a)
-                let lcCallNumEnd = 
-                    match getSingleSubfield datafield "c" with 
-                    | None -> None
-                    | Some _ when tableField.Contains("-") -> None
-                    | Some c -> Some (tableField + c)
-                cnRangeStr <- 
-                    match lcCallNumStart with 
-                        | Some startStr -> 
-                            match lcCallNumEnd with
-                                | Some endStr -> Some (startStr + "-" + endStr)
-                                | None -> Some startStr
-                        | None -> None 
-                subjectNames.AddRange(getAllSubfields datafield "h")
-                subjectNames.AddRange(getAllSubfields datafield "j")
-                callNumCount <- callNumCount + 1
+                // If it has a "z" entry for a table, skip it.
+                if Option.isNone (getSingleSubfield datafield "z") then
+                    cnRangeStr <- 
+                        match getSingleSubfield datafield "a" with //lcCallNumStart with 
+                            | Some startStr -> 
+                                match getSingleSubfield datafield "c" with //lcCallNumEnd with
+                                    | Some endStr -> Some (startStr + "-" + endStr)
+                                    | None -> Some startStr
+                            | None -> None 
+                    // TODO: why are we just adding these? shouldn't we chain them properly?
+                    subjectNames.AddRange(getAllSubfields datafield "h")
+                    subjectNames.AddRange(getAllSubfields datafield "j")
+                    callNumCount <- callNumCount + 1
 
             if datafield.Tag = "253" || datafield.Tag = "353" then // "See" cross reference
                 crossRefs <- parseSeeAlso datafield
@@ -165,24 +150,12 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         if callNumCount = 0 || cnRangeStr.IsNone then
             withNoCallNum <- withNoCallNum + 1
             Logger.Error "No call number entry (153) or string for record %s" controlNumber
-        elif subjectNames.Count > 0 && 
-            (subjectNames.[0].StartsWith("Table for") 
-             || subjectNames.[0].StartsWith("Table of")
-             || subjectNames.[0].StartsWith("Tables of")
-             || subjectNames.[0].StartsWith("Table 1 of")
-             || subjectNames.[0].StartsWith("Table 2 of")
-             || subjectNames.[0].StartsWith("Table 3 of")
-             || subjectNames.[0].StartsWith("Societies table")) then
-            // TODO: just try to parse the CN here, and skip if it fails.
-            Logger.Info "Skipping table entry %s" controlNumber
-        elif subjectNames.Count > 0 && subjectNames.[0].StartsWith("Learned societies (1") then
-            Logger.Info "Skipping 'Learned societies' table for entry %s" controlNumber
         else 
             recordsAdded <- recordsAdded + 1
             insertNode theGraph {
-                uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber);
-                name = SubjectNode.joinSubjectName (List.ofSeq subjectNames); 
-                subdividedName = List.ofSeq subjectNames;
+                uri = System.Uri ("http://knowledgeincoding.net/cnsubject/" + controlNumber)
+                name = SubjectNode.joinSubjectName (List.ofSeq subjectNames)
+                subdividedName = List.ofSeq subjectNames
                 cnString = cnRangeStr; 
                 callNumRange = 
                     match cnRangeStr with
@@ -194,11 +167,10 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                             Logger.Error "CNRange #%d: %s" recordCount errstr 
                             None
                     | None -> None
-                    ;
-                broader = new List<SubjectNode>(); 
-                narrower = new List<SubjectNode>();
-                seeAlso = crossRefs;
-                books = new List<BookRecord>();
+                broader = new List<SubjectNode>()
+                narrower = new List<SubjectNode>()
+                seeAlso = crossRefs
+                books = new List<BookRecord>()
                 booksUnder = 0
             } |> ignore
             // tried this way, not what we want...
