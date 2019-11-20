@@ -142,7 +142,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
             withSubjects <- withSubjects + 1
         // Criterion for adding a book: that it has a title.
         if Option.isSome title then
-            printfn "Adding book: %s" title.Value
+            printfn "Constructing book record for: %s" title.Value
             let trimSlash (s : string) = 
                 if s.EndsWith " /" then s.[0..(s.Length - 3)] else s
             books.Add({

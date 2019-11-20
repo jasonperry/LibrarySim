@@ -32,7 +32,7 @@ let npIndex = NamePrefixIndex.Create()
 
 /// Parse all subfields of "See also" and create a CrossRefInfo object. 
 /// TODO: function like this for 153 also (there can be multiple call numbers)
-let parse253 (datafield: MarcXmlType.Datafield) : CrossrefInfo = 
+let parseSeeAlso (datafield: MarcXmlType.Datafield) : CrossrefInfo = 
     (* let mutable desc =
         if datafield.Subfields.[0].Code = "i" then
             datafield.Subfields.[0].Value
@@ -155,10 +155,10 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                 subjectNames.AddRange(getAllSubfields datafield "j")
                 callNumCount <- callNumCount + 1
 
-            if datafield.Tag = "253" then // "See" cross reference
-                crossRefs <- parse253 datafield
+            if datafield.Tag = "253" || datafield.Tag = "353" then // "See" cross reference
+                crossRefs <- parseSeeAlso datafield
                 if not crossRefs.IsEmpty then
-                    // Possible to get 253 without 153? 
+                    // Possible to get 253 without 153? Yes
                     Logger.Info "Got 'see also' info for %A" cnRangeStr
                     crossRefCount <- crossRefCount + 1
         // End of field detection, filter out and assemble the record.

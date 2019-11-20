@@ -211,13 +211,11 @@ module SubjectGraph =
                     else findit slist.[..List.length slist - 2]
         findit splitSubj
 
-    /// Return the node for the spot in the graph an item should hang on.
+    /// Return the node for the spot in the graph a node (NOT item) should hang on.
     /// Is total; if CN never falls in a range it will go with the given node.
     let findParentByCallNumber graph (cn: LCCN) =
         let rec searchParent (atnode: SubjectNode) = 
             let candidates = 
-                (*Seq.filter (mapOr (fun range -> CNRange.contains range cn) false) 
-                           atnode.narrower *)
                 Seq.filter (fun nd -> if Option.isNone nd.callNumRange then false
                                       else CNRange.contains nd.callNumRange.Value cn) 
                            atnode.narrower
@@ -526,7 +524,23 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
     match item.LCCallNum with
     | None -> None
     | Some cn -> 
-        let parentNode = SubjectGraph.findParentByCallNumber graph cn
+        let rec findItemParent atnode = 
+            let candidates = 
+                Seq.filter (fun nd -> if Option.isNone nd.callNumRange then false
+                                      else CNRange.contains nd.callNumRange.Value cn) 
+                           atnode.narrower
+                |> List.ofSeq
+            match candidates with 
+            | head :: rest -> // probably only one match. Recurse unless it's a leaf.
+                if Seq.isEmpty head.narrower then head // a little weird to "check down"
+                else findItemParent head
+            | [] -> // No containment, use the the rightmost <= node.
+                match (Seq.tryFindBack (fun (nd: SubjectNode) -> 
+                                            nd.callNumRange.Value.startCN <= cn) 
+                                       atnode.narrower) with
+                | Some nd -> nd
+                | None -> atnode
+        let parentNode = findItemParent graph.topNode
         parentNode.books.Add item
         let rec updateCounts node = 
             node.booksUnder <- node.booksUnder + 1

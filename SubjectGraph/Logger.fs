@@ -3,7 +3,7 @@
 module Logger 
 
 type LogLevel = DEBUG | INFO | WARNING | ERROR | FATAL
-let mutable private _level = WARNING
+let mutable private _level = DEBUG
 let mutable private _outfile = System.Console.Out
 let setLevel level = _level <- level
 let setOutfile f = _outfile <- f
