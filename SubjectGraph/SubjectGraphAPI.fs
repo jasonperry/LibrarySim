@@ -329,7 +329,7 @@ let main argv =
       let graph = loadGraph argv.[1]
       let outGraphName = "output/MinimizedGraph.sgb"
       printfn "Loaded graph %s" argv.[1]
-      SubjectGraph.collapseGraph graph (int argv.[2])
+      SubjectGraph.collapseGraph graph (int argv.[2]) // threshold
       let removed = SubjectGraph.cullGraph graph
       SubjectGraph.contractGraph graph // TODO : removed 2, add them together.
       printfn "Removed %d nodes; saving minimized graph %s" removed outGraphName

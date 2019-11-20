@@ -11,7 +11,6 @@ open SparqlQuery
 
 
 /// Cross-reference information list for a subject node.
-/// TODO: Maybe move to SubjectGraph.
 type CrossrefInfo = (string * LCCNRange option * System.Uri option) list
 
 type SubjectNode = {
@@ -304,7 +303,7 @@ module SubjectGraph =
 
     // mapSubTree function: apply a function recursively to the subtree starting at a node.
 
-    // Remove all subtrees with zero elements
+    /// Remove all subtrees with zero elements
     let cullGraph graph =
         let mutable numRemoved = 0 // Ideally, would fold this in the result...
         let rec cull' node = 
@@ -535,9 +534,12 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
                 if Seq.isEmpty head.narrower then head // a little weird to "check down"
                 else findItemParent head
             | [] -> // No containment, use the the rightmost <= node.
+                // I hoped it was already sorted, but this appears to fix a bug.
+                let sorted = Seq.sortBy (fun (nd: SubjectNode) -> nd.callNumRange.Value.startCN)
+                                atnode.narrower
                 match (Seq.tryFindBack (fun (nd: SubjectNode) -> 
                                             nd.callNumRange.Value.startCN <= cn) 
-                                       atnode.narrower) with
+                                       sorted) with
                 | Some nd -> nd
                 | None -> atnode
         let parentNode = findItemParent graph.topNode
