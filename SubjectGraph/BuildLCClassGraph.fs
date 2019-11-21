@@ -68,11 +68,11 @@ let parseSeeAlso (datafield: MarcXmlType.Datafield) : CrossrefInfo =
                 i <- i + 1
                 let cnRange = 
                     try
-                        let startCN = LCCN.parse cnStartStr
+                        let startCN = LCCN.parse cnStartStr     
                         let endCN = if cnEndStr = "" then startCN 
                                     else LCCN.parse cnEndStr
                         Some {startCN=startCN; endCN=endCN}
-                    with CallNumberError errstr -> 
+                    with CallNumberException errstr -> 
                         Logger.Error "CallNumberError in field 253: %s" errstr
                         None
                 (sfi.Value, cnRange, None) :: scanSubfields ()
@@ -163,7 +163,7 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
                         try 
                             Some (CNRange.parse rstr)
                         with
-                        | CallNumberError errstr -> 
+                        | CallNumberException errstr -> 
                             Logger.Error "CNRange #%d: %s" recordCount errstr 
                             None
                     | None -> None
@@ -199,4 +199,4 @@ let buildGraph filename outputGraphFileName =
         saveGraph theGraph outputGraphFileName
         printfn "Class graph saved to %s" outputGraphFileName
     with // Aren't these caught above?
-        | CallNumberError msg -> Logger.Error "CallNumberError: %s" msg
+        | CallNumberException msg -> Logger.Error "CallNumberError: %s" msg

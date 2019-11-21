@@ -4,6 +4,12 @@ let log = printfn
 
 let (|?) = defaultArg
 
+/// Append to a list if an option is Some.
+let appendMaybe (l: System.Collections.Generic.List<_>) opt = 
+    match opt with
+    | Some v -> l.Add(v)
+    | None -> ()
+
 /// Where to put this? Either in common or NamePrefixIndex.
 /// Return true if list1 is a strict prefix of list2 (not equal).
 let rec isStrictPrefix list1 list2 = 

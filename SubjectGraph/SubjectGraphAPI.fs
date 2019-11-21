@@ -155,10 +155,10 @@ module BooksResult =
         + "<td><b>" + HttpUtility.HtmlEncode(br.Title) + "</b></td>"
         + "<td>" + HttpUtility.HtmlEncode(br.Authors) + "</td>"
         + "</tr><tr class=\"bookend\"><td>" + mapOr string "" br.Year + "</td>"
-        + match br.Link with 
-          | Some link -> "<td><a href=\"" + link + "\" target=\"_blank\">" + link + "</a></td>"
-          | None -> "<td></td>"
-        + "</tr>"
+        + "<td>"
+        + String.concat "<br/>" (
+            List.map (fun link -> "<a href=\"" + link + "\" target=\"_blank\">" + link + "</a>") br.Links)
+        + "</td></tr>"
     "<div class=\"booklisting\"><table><tr>"
     + (String.concat "</tr><tr>" (List.map bookfmt bres.books))
     + "</tr></table></div>"
@@ -289,11 +289,13 @@ let main argv =
       0
   | "addBooksToClassGraph" -> 
       let graph = loadGraph argv.[1]
+      let outGraphName = 
+          if argv.Length > 3 then 
+              argv.[3] 
+          else "output/BooksAndClassGraph.sgb"
       addBooksToClassGraph graph argv.[2]
-      if argv.Length > 3 then 
-        saveGraph graph argv.[3]
-      else
-        saveGraph graph "output/BooksAndClassGraph.sgb"
+      saveGraph graph outGraphName
+      printfn "Saved graph with books as %s" outGraphName
       0
   | "cullGraph" ->
         let graph = loadGraph argv.[1]

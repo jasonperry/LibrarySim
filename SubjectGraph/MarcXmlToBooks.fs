@@ -74,7 +74,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
         let mutable lcCallNum = None
         let mutable lcLetters = None
         let mutable year = None
-        let mutable link = None
+        let links = new List<string>()
         let subjects = new List<SubjectInfo>()
         for controlfield in record.Controlfields do
             if controlfield.Tag = "001" then
@@ -126,7 +126,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                     withCallNum <- withCallNum + 1
                 with 
                     // If the call number is letters (gutenberg), detect and store.
-                    | CallNumberError errorstr -> 
+                    | CallNumberException errorstr -> 
                         if LCCN.isCNLetters cn then 
                             lcLetters <- Some cn
                         else printfn "(!!) %s" errorstr
@@ -135,7 +135,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 //printfn "Dewey Call number: %s" dcn.Value
                 withDeweyNum <- withDeweyNum + 1
             elif datafield.Tag = "856" then
-                link <- getSingleSubfield datafield "u"
+                appendMaybe links (getSingleSubfield datafield "u")
         // endfor (record.Datafields)
         totalRecords <- totalRecords + 1
         if subjects.Count > 0 then
@@ -158,7 +158,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 Subjects = List.ofSeq(subjects)
                 // To be more general, do I only want a URI when I add it to the graph?
                 Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber)
-                Link = link
+                Links = List.ofSeq links
             })
             // For now, only books with subjects.
     printfn "Processed %d records, %d parsed call numbers, %d subjects," 

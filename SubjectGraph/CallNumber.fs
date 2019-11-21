@@ -6,7 +6,7 @@ open System.Text.RegularExpressions
 
 open Common
 
-exception CallNumberError of string
+exception CallNumberException of string
 
 // BEST REGEX EVAR 
 // Still to check: how many digits can cutter numbers and decimals have? 
@@ -112,7 +112,7 @@ module LCCN =
             }
         else
             // DELETED: code to try partial match.
-            raise <| CallNumberError ("Could not parse LOC Call Number " + cnString)
+            raise <| CallNumberException ("Could not parse LOC Call Number " + cnString)
 
     /// True if two call numbers are the same except for year and misc.
     let sameTitle cn1 cn2 = 
@@ -170,7 +170,7 @@ type LCCNRange = {
 module CNRange = // nice if it could be a functor over types of CNs...
     let create startCN endCN = 
         if startCN > endCN then
-            raise (CallNumberError "Illegal CN Range: Start Call Number is higher")
+            raise (CallNumberException "Illegal CN Range: Start Call Number is higher")
         else 
             {startCN = startCN; endCN = endCN}
 
@@ -190,7 +190,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
                 elif Char.IsDigit c then 'd'
                 elif Char.IsPunctuation c || Char.IsSeparator c then 'p'
                 else raise <| 
-                     CallNumberError ("Unrecognized character class for: " + string c)
+                     CallNumberException ("Unrecognized character class for: " + string c)
             // let cnString = cnString.Replace(" ", "") // now treat space as punct.
             let charClasses = new List<char>()
             let segments = new List<string>()
@@ -231,7 +231,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
         let _, suffixClasses = segmentCNString suffixString
         let matchPos = leftSuffixMatch classes suffixClasses
         if matchPos = -1 then
-            raise <| CallNumberError 
+            raise <| CallNumberException 
                      ("Could not match CN suffix " + cnString + ", " + suffixString)
         else 
             (String.concat "" cnSegments.[..matchPos-1]) + suffixString
@@ -251,7 +251,7 @@ module CNRange = // nice if it could be a functor over types of CNs...
                     (cnStrings.[1], cnStrings.[3])
                 // TODO: 3-parters, like [|"CR5744.A2"; "CR5744.A3"; "Z"|]
                 else 
-                    raise <| CallNumberError 
+                    raise <| CallNumberException 
                      (sprintf "Unrecognized segment format for CN range: %A" cnStrings)
             let startCNParsed  = LCCN.parse startCNStr; // if it throws, it throws.
             let endCNParsed = 
@@ -266,20 +266,20 @@ module CNRange = // nice if it could be a functor over types of CNs...
                         Logger.Info "    Successfully patched %s with suffix %s: %s" 
                             cnStrings.[0] cnStrings.[1] endStrPatched
                         LCCN.parse endStrPatched
-                    with CallNumberError msg ->
+                    with CallNumberException msg ->
                         Logger.Warning "    Failed patch or parse: %s" msg
                         startCNParsed // What else could we do here?
                 else
                     try
                         LCCN.parse endCNStr
-                    with CallNumberError _ -> 
+                    with CallNumberException _ -> 
                         try
                             Logger.Info "End call number (%s) didn't parse, trying patch" endCNStr
                             let endStrPatched = patchCNSuffix cnStrings.[0] cnStrings.[1]
                             Logger.Info "    Successfully patched %s with suffix %s: %s" 
                                     cnStrings.[0] cnStrings.[1] endStrPatched // DEBUG
                             LCCN.parse endStrPatched
-                        with CallNumberError msg ->
+                        with CallNumberException msg ->
                             Logger.Warning "    Failed patch or parse: %s" msg
                             startCNParsed // should probably change
             if endCNParsed >= startCNParsed

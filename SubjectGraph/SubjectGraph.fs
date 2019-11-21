@@ -161,7 +161,7 @@ type SubjectGraph = {
         // UPDATE: used to be a list, but now I want to assume it's unique. 
         cnIndex : Dictionary<LCCNRange, SubjectNode>;  
         subjectNameIndex : Dictionary<string, SubjectNode list>;
-        subjectPrefixIndex : NamePrefixIndex; // hopefully obsolete.
+        //subjectPrefixIndex : NamePrefixIndex; // hopefully obsolete.
         // should be unique...hashset? Can we make out of BasicURI...yes.
         uriIndex : Dictionary<Uri, SubjectNode>; 
     } 
@@ -193,7 +193,7 @@ module SubjectGraph =
             topNode = topNode;
             cnIndex = cnIndex;
             subjectNameIndex = new Dictionary<_,_> ();
-            subjectPrefixIndex = NamePrefixIndex.Create ();
+            //subjectPrefixIndex = NamePrefixIndex.Create ();
             uriIndex = uriIndex
         }
 
@@ -290,7 +290,7 @@ module SubjectGraph =
         // Oops, I forgot to add as a child of the parent!
         parent.narrower.Add newNode
         // Add to the indexes. 
-        graph.subjectPrefixIndex.Add newNode // Will this work if it's empty?
+        //graph.subjectPrefixIndex.Add newNode // Will this work if it's empty?
         graph.uriIndex.Add(newNode.uri, newNode)
         // If subject has a call number, add that to the index.
         match newNode.callNumRange with 
@@ -569,7 +569,6 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
         // update the booksUnder count upward.
         let rec updateCounts node = 
             node.booksUnder <- node.booksUnder + 1
-            //printf "."
             Seq.iter updateCounts node.broader
         for node in nodes do
             // Only add a book under a node if there's no narrower one.
@@ -619,7 +618,7 @@ let browseGraphCLI (graph : SubjectGraph) =
                         printfn "\n**** Books for subject \"%s\" ****" currentList.[i].name
                         for book in currentList.[i].books do
                             printfn "][ %s (%s)" book.Title book.Authors
-                            if Option.isSome book.Link then printfn "   %s" book.Link.Value
+                            if not (List.isEmpty book.Links) then printfn "   %s" book.Links.[0]
                         (* currentList.[i].books |> 
                             Seq.iter (fun (book: BookRecord) -> printfn "][ %s" book.Title) *)
                     printfn ""
@@ -700,7 +699,7 @@ let saveGraph (graph: SubjectGraph) graphFileName =
     let outstream = File.OpenWrite graphFileName
     let serializer = FsPickler.CreateBinarySerializer()
     //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
-    graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
+    //graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
     serializer.Serialize(outstream, graph)
     (* let pickle = serializer.Pickle(graph)
     outstream.Write(serializer.Pickle(graph), 0, pickle.Length) *)

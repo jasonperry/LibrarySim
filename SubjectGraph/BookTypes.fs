@@ -26,7 +26,7 @@ type BookRecord = {
     Subjects: SubjectInfo list
     Year: int option
     Uri : Uri
-    Link: string option
+    Links: string list
 }
 
 module BookRecord = 
