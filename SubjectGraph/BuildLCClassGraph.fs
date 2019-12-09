@@ -14,10 +14,6 @@ module BuildLCClassGraph
 //#r "obj/Debug/netcoreapp2.1/SubjectGraph.dll" *)
 
 open System.Collections.Generic // Dictionary
-open System.IO // for file read and write 
-open System.IO.Compression
-open System.Xml
-open FSharp.Data
 
 open Common
 open MarcXml

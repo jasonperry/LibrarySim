@@ -22,7 +22,7 @@ open BookTypes
 open CallNumber
 open SubjectGraph
 
-let OUTDIR = @"./output/"
+let OUTDIR = @"../output/"
 let recordsFileName = OUTDIR + "BookRecords.brb"
 
 /// Giving a constant file name initializes the type provider magic.

@@ -648,19 +648,6 @@ let browseGraphCLI (graph : SubjectGraph) =
         (* active pattern to match and interpret? *)
     loop graph.topNode
         
-// Maybe I won't need to use the RDF library at all. 
-(*
-open RDFSharp.Model
-
-let loadSchema filename = 
-    // let g = RDFGraph.FromFile (RDFModelEnums.RDFFormats.RdfXml, filename)
-    printf "did something."
-
-let hello name =
-    printfn "Hello %s" name
-    // let rdffunc = new RDFSharp.Model.RDFGraph ()
-    printf "made a graph!"
-*)
 
 // deserialize. The opens are a hint that maybe this should go elsewhere...
 // or in a module.

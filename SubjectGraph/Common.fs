@@ -19,7 +19,7 @@ let rec isStrictPrefix list1 list2 =
         | (x::xs, y::ys) -> x = y && isStrictPrefix xs ys
 
 /// Apply a function to an option or use a default (from OCaml)
-let mapOr someFn defval optval  = 
+let mapOr someFn defval optval = 
     match optval with
     | Some v -> someFn v
     | None -> defval

@@ -6,7 +6,7 @@ open System.Xml
 open FSharp.Data
 
 [<Literal>]
-let DATADIR = @"./indexdata/"
+let DATADIR = @"../indexdata/"
 [<Literal>]
 let MODSSAMPLE = DATADIR + "HarvardMODSResult.xml"
 

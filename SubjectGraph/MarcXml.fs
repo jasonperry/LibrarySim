@@ -6,14 +6,15 @@ open System.IO.Compression
 open System.Xml
 open FSharp.Data
 
+// NOTE: these are relative to the project subdirectory now.
 [<Literal>]
-let DATADIR = @"./indexdata/"
+let DATADIR = @"../indexdata/"
 [<Literal>]
 // let XMLSAMPLE = DATADIR + "MarcRecordSample.xml" 
 let XMLSAMPLE = DATADIR + "marc-prefix-sample.xml"
 /// This type is for a single record, so we can read incrementally.
 //type MarcXmlType = XmlProvider<XMLSAMPLE> 
-type MarcXmlType = XmlProvider<Schema="./indexdata/MARC21slim.xsd.xml">
+type MarcXmlType = XmlProvider<Schema="../indexdata/MARC21slim.xsd.xml">
 
 /// Handles both gzipped and uncompressed MarcXml files.
 let getXmlReader filename =
