@@ -4,18 +4,10 @@ module BookTypes
 open System // Uri
 open System.IO
 open System.Runtime.Serialization.Formatters.Binary // TODO: maybe replace with FsPickler.
+open System.Collections.Generic
 
 open Common
 open CallNumber
-
-/// A record about a subject, not dependent on SubjectGraph.
-[<Struct>] // Does "struct" make it more efficient? Measure!
-type SubjectInfo = {
-  uri : System.Uri option;
-  cnRange : LCCNRange option;
-  name : string;
-  itemsUnder : int;
-}
 
 /// Primary type for information about a single catalog item.
 type BookRecord = {
@@ -23,7 +15,7 @@ type BookRecord = {
     Authors: string
     LCCallNum : LCCN option
     LCLetters: string option
-    Subjects: SubjectInfo list
+    Subjects: List<System.Uri> // now mutable, formerly SubjectInfo list
     Year: int option
     Uri : Uri
     Links: string list
@@ -31,17 +23,19 @@ type BookRecord = {
 
 module BookRecord = 
     /// Replace the subject information for a book with a new record.
-    let updateSubject record (sinfo : SubjectInfo) = 
-        let rec update infolist = 
-            match infolist with
-                | [] -> [sinfo]
+    let updateSubject record (subjLink : System.Uri) = 
+        if not (record.Subjects.Contains(subjLink)) then
+            record.Subjects.Add(subjLink)
+        (* let rec update uriList = 
+            match uriList with
+                | [] -> [subjLink]
                 | info :: rest -> 
                     // Find the matching subject by name.
-                    if sinfo.name = info.name then
-                        sinfo :: rest
+                    if subjLink.name = info.name then
+                        subjLink :: rest
                     else 
                         info :: (update rest)
-        { record with Subjects = update record.Subjects }
+        { record with Subjects = update record.Subjects } *)
     let getLCCNString record = 
         match record.LCCallNum with 
         | Some cn -> LCCN.toString cn

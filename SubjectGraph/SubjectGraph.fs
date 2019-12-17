@@ -27,6 +27,7 @@ type SubjectNode = {
     mutable booksUnder : int  // to keep a count
 }
 
+
 /// Utility functions for individual SubjectNodes.
 module SubjectNode =
     // TODO: These are now specific to subdividedNames, so go elsewhere?
@@ -42,9 +43,9 @@ module SubjectNode =
         name.Replace(" -- ", "--").Replace("--","@").Split([|'@'|])
         |> Array.filter (fun s -> s <> "")
         |> List.ofArray
-    let toSubjectInfo node = 
+    (* let toSubjectInfo (node: SubjectNode) = 
         {uri = Some node.uri; cnRange = node.callNumRange; 
-         name = node.name; itemsUnder = node.booksUnder}
+         name = node.name; itemsUnder = node.booksUnder} *)
 
 /// A class with methods for finding subjects by prefix. Not currently used in LCCN-based graph.
 type NamePrefixIndex = private {
@@ -248,7 +249,7 @@ module SubjectGraph =
     /// returning list of only topmost nodes that match.
     let search graph startURI (searchStr : string) = 
         let searchStr = searchStr.ToLower()
-        let rec search' fromnode = 
+        let rec search' (fromnode: SubjectNode) = 
             if fromnode.name.ToLower().Contains searchStr then [fromnode]
             else 
                 Seq.collect search' fromnode.narrower
@@ -383,14 +384,14 @@ module SubjectGraph =
 /// Return true if 1st URI is higher in the graph than the 2nd.
 let rec isBroaderSubject (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 
     // ? should it accept a node? It should be one-to-one, but...
-    let (node1, node2) = graph.uriIndex.[uri1], 
-                         graph.uriIndex.[uri2]
+    let (node1: SubjectNode, node2: SubjectNode) = graph.uriIndex.[uri1], 
+         graph.uriIndex.[uri2]
     if node2.broader.Count = 0 then
         false
     elif node2.broader.Contains(node1)  then
         true
     else 
-        Seq.exists (fun n -> isBroaderSubject graph uri1 n.uri) node2.broader
+        Seq.exists (fun (n: SubjectNode) -> isBroaderSubject graph uri1 n.uri) node2.broader
 
 (******** Stuff below here is old: SPARQL querying functions and CLI. *******)
 
@@ -549,11 +550,12 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
             Seq.iter updateCounts node.broader
         updateCounts parentNode
         printfn "...added under %s" parentNode.name
-        BookRecord.updateSubject item (SubjectNode.toSubjectInfo parentNode) 
+        BookRecord.updateSubject item (parentNode.uri) 
         |> Some
 
 /// Add a book's subjects to a graph (and the book too if selected)
-/// NOT CURRENTLY USED for CN-based graph.
+/// NOT CURRENTLY USED for CN-based graph. Broken due to change
+(* 
 let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) =
     // Try to add a subject for each name, get node back 
     let nodes = book.Subjects
@@ -563,9 +565,9 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
     // If we're storing books too, add it and update the counts
     if addBook then
         // Add URIs for the found subjects to the book record.
-        let updatedBook = 
-            (List.map SubjectNode.toSubjectInfo nodes)
-            |> List.fold BookRecord.updateSubject book 
+        //let updatedBook = 
+        (List.map (fun nd -> nd.uri) nodes)
+          |> List.iter (BookRecord.updateSubject book)
         // update the booksUnder count upward.
         let rec updateCounts node = 
             node.booksUnder <- node.booksUnder + 1
@@ -574,12 +576,13 @@ let addBookSubjects (graph : SubjectGraph) (addBook : bool) (book : BookRecord) 
             // Only add a book under a node if there's no narrower one.
             if not (List.exists (fun n -> isBroaderSubject graph node.uri n.uri) nodes) then
                 printfn "Adding book under node %s" node.name
-                node.books.Add(updatedBook)
+                // node.books.Add(updatedBook)
                 updateCounts node
     if nodes.IsEmpty then
         Logger.Warning "No subject found for \"%s\"; book not added" book.Title
         false
     else true
+*)
 
 /// Loop to browse a graph. Currently only does a tree walk (no sideways links)
 /// To make generic: pass in a "getCommand", "outputSubjectList" and "outputBookList" funs. 
@@ -594,7 +597,7 @@ let browseGraphCLI (graph : SubjectGraph) =
     let rec loop (currentNode : SubjectNode) = 
         let currentList = currentNode.narrower
         // When I go up, construct mutable list.. why not make an immutable list?
-        List.iteri (fun i node -> 
+        List.iteri (fun i (node: SubjectNode) -> 
                         let entryString = 
                             (sprintf "| %d. %s (%d) " i node.name node.booksUnder)
                         printf "%-50s" entryString

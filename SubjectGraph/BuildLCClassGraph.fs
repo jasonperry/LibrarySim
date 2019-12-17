@@ -114,10 +114,9 @@ let addClassRecords theGraph (records : MarcXmlType.Record seq) =
         let mutable crossRefs = []
         callNumCount <- 0
         for controlfield in record.Controlfields do
-            // Is it always okay to get the control number from the datafield
-            //   instead of control field? (datafield code removed)
+            // Now getting this from control field instead of data field.
             if controlfield.Tag = "001" then
-                controlNumber <- controlfield.Value
+                controlNumber <- controlfield.Value.Split([|' '|]) |> String.concat ""
         for datafield in record.Datafields do
             if datafield.Tag = "153" then
                 // DELETED: former attempt to use computation expressions

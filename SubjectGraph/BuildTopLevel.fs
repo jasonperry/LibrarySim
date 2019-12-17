@@ -14,18 +14,18 @@ open System.Collections.Generic
 open BookTypes
 open CallNumber
 
-let graphFileName = "../output/TopLevelIndex.sgb"
+let graphFileName = __SOURCE_DIRECTORY__ + @"/output/TopLevelIndex.sgb"
 // [<Literal>] 
 // let DATADIR = @"./indexdata/" // OK for type provider on Windows, but not for running!
 [<Literal>]
 //let CSVFILE = @"indexdata/TopLevelIndex.csv"
-let CSVFILE = @"../indexdata/TopLevelIndex-toponly.csv"
+let CSVFILE = __SOURCE_DIRECTORY__ + @"/indexdata/TopLevelIndex-toponly.csv"
 
 type LOCIndex = FSharp.Data.CsvProvider<CSVFILE, AssumeMissingValues=true>
 
 // TODO: addSubjectNode (uri, name, altnames, parents) - computes booksUnder from narrower
 let buildGraph () = 
-    let index = LOCIndex.Load(__SOURCE_DIRECTORY__ + "/" + CSVFILE)
+    let index = LOCIndex.Load(CSVFILE)
     let theGraph = SubjectGraph.emptyGraph () 
     let mutable nodeCount = 1 // for top node.
 

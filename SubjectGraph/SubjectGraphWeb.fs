@@ -21,6 +21,17 @@ open System
 let listenIPs = ["0.0.0.0"] // ["127.0.0.1"] //; "192.168.0.13"]
 let appPort = 8999
 
+/// A record about a subject, not dependent on SubjectGraph.
+[<Struct>] // Does "struct" make it more efficient? Measure!
+type SubjectInfo = {
+  uri : System.Uri option;
+  cnRange : LCCNRange option;
+  name : string;
+  itemsUnder : int;
+} with static member OfSubjectNode (node: SubjectNode) = 
+        {uri = Some node.uri; cnRange = node.callNumRange; 
+         name = node.name; itemsUnder = node.booksUnder}
+         
 /// Self-contained info about one graph node, to be directly JSONized 
 ///   and sent to the browser.
 /// ...should it contain a pointer to the books? or back to the node itself?
@@ -31,6 +42,7 @@ type SubjectsResult = {
   cnRange : string;
   seeAlso: CrossrefInfo
 }
+
 module SubjectsResult = 
   let ofNode (node : SubjectNode) = {
     thisSubject = {
@@ -40,20 +52,20 @@ module SubjectsResult =
         itemsUnder = node.booksUnder
     };
     broader = node.broader 
-      |> Seq.map SubjectNode.toSubjectInfo
+      |> Seq.map SubjectInfo.OfSubjectNode
       |> List.ofSeq;
       // Q: Is there a way to cast this to not convert the whole list? I've tried...
     narrower = node.narrower 
-      |> Seq.map SubjectNode.toSubjectInfo
+      |> Seq.map SubjectInfo.OfSubjectNode
       |> List.ofSeq
       |> List.sortWith (fun (si1: SubjectInfo) si2 -> 
                             CNRange.compare si1.cnRange si2.cnRange)
     cnRange = node.cnString |? ""
     seeAlso = node.seeAlso
   }
-  let nodeListToInfoList nodes = 
+  let nodeListToInfoList (nodes: SubjectNode list) = 
       List.map 
-          (fun nd -> {
+          (fun (nd: SubjectNode) -> {
                uri = Some nd.uri;
                cnRange = nd.callNumRange;
                name = nd.name;
@@ -142,7 +154,7 @@ type BooksResult = {
 module BooksResult = 
 
   let ofNode (node : SubjectNode) = {
-    thisSubject = SubjectNode.toSubjectInfo node
+    thisSubject = SubjectInfo.OfSubjectNode node
     // Sorting assumes there's a call number.
     books = node.books
         |> Seq.sortBy (fun (br : BookRecord) -> br.LCCallNum.Value) 

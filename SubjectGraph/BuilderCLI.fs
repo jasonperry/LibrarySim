@@ -8,6 +8,8 @@ open MarcXmlToBooks
 open Mods
 open System
 
+let OUTDIR = __SOURCE_DIRECTORY__ + @"\output\"
+
 [<EntryPoint>]
 let main argv =
   match argv.[0] with 
@@ -15,7 +17,7 @@ let main argv =
       BuildTopLevel.writeTopLevelGraph ()
       0
   | "buildLCClassGraph" -> 
-      BuildLCClassGraph.buildGraph argv.[1] "output/ClassGraph.sgb"
+      BuildLCClassGraph.buildGraph argv.[1] (OUTDIR + "ClassGraph.sgb")
       0
   | "addBooksToClassGraph" -> 
       let graph = loadGraph argv.[1]

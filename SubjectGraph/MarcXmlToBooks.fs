@@ -1,15 +1,6 @@
 /// Create and serialize BookRecord list from a MarcXML catalog.
 module MarcXmlToBooks
 
-(* //#I __SOURCE_DIRECTORY__
-//#r "../packages/FSharp.Data.2.4.6/lib/net45/FSharp.Data.dll"
-#I "C:\\Users\\Jason\\"
-#r ".nuget/packages/FSharp.Data/3.0.0/lib/net45/FSharp.Data.dll"
-#r "System.Xml.Linq.dll" // guess it's the net45 version.
-#r "obj/Debug/net461/SubjectGraph.exe"
-// #load "CallNumber.fs"
-// #load "BookRecord.fs" // These are in the built library now. *)
-
 open System.Collections.Generic // Always need this for mutable lists.
 open System.IO // for file read and write 
 open System.IO.Compression
@@ -22,7 +13,7 @@ open BookTypes
 open CallNumber
 open SubjectGraph
 
-let OUTDIR = @"../output/"
+let OUTDIR = __SOURCE_DIRECTORY__ + @"/output/"
 let recordsFileName = OUTDIR + "BookRecords.brb"
 
 /// Giving a constant file name initializes the type provider magic.
