@@ -80,10 +80,10 @@ let main argv =
       for book in sortedBooks do 
           printfn "%s : %s" (BookRecord.getLCCNString book) book.Title
       0
-  | "buildGutenGraph" ->
+  (* | "buildGutenGraph" ->
       // any way to detect if records.brb is up to date? Not bothering yet!
       BuildFromBooks.buildGraph argv.[1]
-      0
+      0 *)
   | "browse" ->
       printfn "Loading graph %s" argv.[1]
       let graph = loadGraph argv.[1]

@@ -384,8 +384,8 @@ module SubjectGraph =
 /// Return true if 1st URI is higher in the graph than the 2nd.
 let rec isBroaderSubject (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) = 
     // ? should it accept a node? It should be one-to-one, but...
-    let (node1: SubjectNode, node2: SubjectNode) = graph.uriIndex.[uri1], 
-         graph.uriIndex.[uri2]
+    let (node1: SubjectNode, node2: SubjectNode) = 
+        graph.uriIndex.[uri1], graph.uriIndex.[uri2]
     if node2.broader.Count = 0 then
         false
     elif node2.broader.Contains(node1)  then
@@ -550,7 +550,7 @@ let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
             Seq.iter updateCounts node.broader
         updateCounts parentNode
         printfn "...added under %s" parentNode.name
-        BookRecord.updateSubject item (parentNode.uri) 
+        BookRecord.updateSubject item (parentNode.name, parentNode.uri) 
         |> Some
 
 /// Add a book's subjects to a graph (and the book too if selected)

@@ -66,18 +66,13 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
         let mutable lcLetters = None
         let mutable year = None
         let links = new List<string>()
-        let subjects = new List<SubjectInfo>()
+        let subjects = new List<string * System.Uri option>()
+        // Formerly got control number from datafield; seems more robust to 
+        //  get it from the control field.
         for controlfield in record.Controlfields do
             if controlfield.Tag = "001" then
                 controlNumber <- controlfield.Value
         for datafield in record.Datafields do
-            // Seems more robust to get control number from the control field.
-            (* if datafield.Tag = 10 then
-                controlNumber <- getSingleSubfield datafield "a"
-                // remove the space.
-                match controlNumber with
-                | Some s -> controlNumber <- Some (s.Replace (" ", ""))
-                | None -> () *)
             if datafield.Tag = "245" then
                 // "Title Statement found: "
                 title <- getSingleSubfield datafield "a"
@@ -101,10 +96,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                                     .Value
                                     .Replace(" -- ", "--")
                 // printfn "Subject (%d): %s" datafield.Tag subjName
-                subjects.Add(
-                    // I feel a little bit of a mismatch here. SubjectInfo seems really
-                    // for the HTTP API, not for keeping with books.
-                    { name = subjName; cnRange = None; uri = None; itemsUnder = 0})
+                subjects.Add (subjName, None)
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
             elif datafield.Tag = "050" then
@@ -146,7 +138,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                 LCCallNum = lcCallNum
                 LCLetters = lcLetters
                 Year = year
-                Subjects = List.ofSeq(subjects)
+                Subjects = subjects
                 // To be more general, do I only want a URI when I add it to the graph?
                 Uri = System.Uri ("http://knowledgeincoding.net/item/" + controlNumber)
                 Links = List.ofSeq links
@@ -162,12 +154,14 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
 let processBooks xmlFilename = 
     // let allbooks = processRecords (Marc21Type.Parse (File.ReadAllText xmlfile))
     let allbooks = processBookRecords (getRecordSeq (getXmlReader xmlFilename))
-    BookTypes.saveBooks allbooks recordsFileName
-    printfn "Wrote records to file %s" recordsFileName
-
+    // BookTypes.saveBooks allbooks recordsFileName
+    //printfn "Wrote records to file %s" recordsFileName
+    let bookDB = new BookTypes.BooksDB (OUTDIR + "books.sqlite")
+    let numAdded = bookDB.AddBooks (List.ofSeq allbooks)
+    printfn "Wrote %d books to database" numAdded
 
 /// top-level function for parsing MarcXML item records and adding to the graph.
-/// TODO: Move to SubjectGraph
+/// TODO: Move to SubjectGraph. No! just make it get the Subject URI.
 let addBooksToClassGraph (graph: SubjectGraph) xmlFilename = 
     let skippedCallLetters = [ "YA"; ]
     processBookRecords (getRecordSeq (getXmlReader xmlFilename))

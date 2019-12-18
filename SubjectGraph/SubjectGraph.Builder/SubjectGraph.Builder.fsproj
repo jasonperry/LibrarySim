@@ -17,7 +17,7 @@
     <Compile Include="..\BuildTopLevel.fs" />
     <Compile Include="..\BuildLCClassGraph.fs" />
     <Compile Include="..\CatalogQuery.fs" />
-    <Compile Include="..\BuildFromBooks.fs" />
+    <!-- <Compile Include="..\BuildFromBooks.fs" /> -->
     <Compile Include="..\MarcXmlToBooks.fs" />
     <Compile Include="..\BuilderCLI.fs" />
   </ItemGroup>

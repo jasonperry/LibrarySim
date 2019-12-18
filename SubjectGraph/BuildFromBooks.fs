@@ -1,4 +1,4 @@
-/// Build a graph from a serialized set of BookRecords.
+/// Build a graph from a serialized set of BookRecords. DEFUNCT
 module BuildFromBooks
 
 (* #I __SOURCE_DIRECTORY__  // though it doesn't need any packages
