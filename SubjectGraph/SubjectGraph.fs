@@ -9,7 +9,6 @@ open BookTypes
 open CallNumber
 open SparqlQuery
 
-
 /// Cross-reference information list for a subject node.
 type CrossrefInfo = (string * LCCNRange option * System.Uri option) list
 
@@ -23,7 +22,7 @@ type SubjectNode = {
     broader : List<SubjectNode>; // SubjectNode list;  So sad, had to make it mutable...
     narrower : List<SubjectNode>; // mutable; new parents not added, but children are
     mutable seeAlso: CrossrefInfo;
-    books : List<BookRecord>;
+    books : List<BookRecord>; // Get rid of?
     mutable booksUnder : int  // to keep a count
 }
 
@@ -156,15 +155,16 @@ type NamePrefixIndex = private {
 /// SubjectGraph record type.
 type SubjectGraph = {
         // I tried making it a class but then couldn't modify the mutable fields.
-        // topLevel : List<SubjectNode>; 
-        topNode : SubjectNode;
+        // topLevel : List<SubjectNode>
+        topNode : SubjectNode
         // went back to immutable lists. Even broaders won't actually be added twice.
         // UPDATE: used to be a list, but now I want to assume it's unique. 
-        cnIndex : Dictionary<LCCNRange, SubjectNode>;  
-        subjectNameIndex : Dictionary<string, SubjectNode list>;
+        cnIndex : Dictionary<LCCNRange, SubjectNode>
+        subjectNameIndex : Dictionary<string, SubjectNode list>
         //subjectPrefixIndex : NamePrefixIndex; // hopefully obsolete.
         // should be unique...hashset? Can we make out of BasicURI...yes.
-        uriIndex : Dictionary<Uri, SubjectNode>; 
+        uriIndex : Dictionary<Uri, SubjectNode>
+        // mutable bookDB : BooksDB option
     } 
 
 /// Functions relevant to the SubjectGraph data structure.
@@ -191,11 +191,12 @@ module SubjectGraph =
         cnIndex.Add(topNode.callNumRange.Value, topNode)
         // Don't bother adding top to name indexes.
         { 
-            topNode = topNode;
-            cnIndex = cnIndex;
-            subjectNameIndex = new Dictionary<_,_> ();
-            //subjectPrefixIndex = NamePrefixIndex.Create ();
+            topNode = topNode
+            cnIndex = cnIndex
+            subjectNameIndex = new Dictionary<_,_> ()
+            //subjectPrefixIndex = NamePrefixIndex.Create ()
             uriIndex = uriIndex
+            // bookDB = None
         }
 
     /// Probably more efficient than maintaining the prefixIndex, but not sufficient.
@@ -272,7 +273,7 @@ module SubjectGraph =
                 // Oops, I have to build a list and remove later from "atnode"
                 // Seq.iter (fun child -> atnode.narrower.Remove child |> ignore) childCandidates
                 Seq.iter (fun child -> child.broader.Remove atnode |> ignore) childCandidates
-                Seq.iter (fun child -> child.broader.Add newNode |> ignore) childCandidates
+                Seq.iter (fun child -> child.broader.Add newNode) childCandidates
                 (atnode, List.ofSeq childCandidates)
             else 
                 // Try to find nodes it goes below and recurse
@@ -311,7 +312,8 @@ module SubjectGraph =
             // let toRemove = Seq.filter (fun cn -> cn.booksUnder = 0) node.narrower
             // Seq.iter (fun cn -> node.narrower.Remove(cn) |> ignore) toRemove
             // removed <- removed + Seq.length toRemove
-            numRemoved <- numRemoved + node.narrower.RemoveAll(fun cn -> cn.booksUnder = 0)
+            numRemoved <- numRemoved + 
+                node.narrower.RemoveAll(fun cn -> cn.booksUnder = 0)
             Seq.iter cull' node.narrower
         cull' graph.topNode
         numRemoved

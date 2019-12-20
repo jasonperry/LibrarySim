@@ -153,10 +153,10 @@ type BooksResult = {
 }
 module BooksResult = 
 
-  let ofNode (node : SubjectNode) = {
+  let ofNode (node : SubjectNode) (booksDB: BooksDB)= {
     thisSubject = SubjectInfo.OfSubjectNode node
     // Sorting assumes there's a call number, which there will be if it's in the graph
-    books = node.books
+    books = booksDB.BooksForSubject node.uri
         |> Seq.sortBy (fun (br : BookRecord) -> br.LCCallNum.Value) 
         |> List.ofSeq
   }
@@ -178,8 +178,8 @@ module BooksResult =
 // end module BooksResult
 
 /// Return a BookResult object for a URI.
-let getBookResult (g: SubjectGraph) uri = 
-    BooksResult.ofNode g.uriIndex.[uri]
+let getBookResult (g: SubjectGraph) uri booksDB = 
+    BooksResult.ofNode g.uriIndex.[uri] booksDB
 
 /// Outputs the header for the SubjectGraph browsing web app.
 let pageHeader (r: HttpRequest) = 
@@ -225,7 +225,7 @@ let withQueryUri query f =
           RequestErrors.bad_request ("Unknown request variable."B)
 
 /// Suave dispatcher for the SubjectGraph web app.
-let dispatch g =
+let dispatch g booksDB =
   choose 
     [ GET >=> choose
         [ 
@@ -256,7 +256,9 @@ let dispatch g =
                          (r.url.GetLeftPart(System.UriPartial.Authority))
                          (getSubjectResult g uri)
                        + "<hr>"
-                       + BooksResult.toHtml (getBookResult g uri)
+                       + match booksDB with 
+                         | Some db -> BooksResult.toHtml (getBookResult g uri db)
+                         | None -> ""
                        + "</body></html>")) )
           path "/searchsubj"
           >=> setMimeType "text/html; charset=utf-8"
@@ -293,11 +295,22 @@ let dispatch g =
 [<EntryPoint>]
 let main argv =
     let theGraph = loadGraph argv.[0]
+    let booksDB = 
+        if argv.Length > 1 then
+          let db = new BooksDB(argv.[1])
+          db.DbConn.Open()
+          Some db
+        else 
+          None       
     printfn "Loaded subject graph"
     startWebServer 
         { defaultConfig with 
             bindings = List.map (fun ip -> HttpBinding.createSimple HTTP ip appPort) 
                                 listenIPs 
         }
-        (dispatch theGraph)
+        (dispatch theGraph booksDB)
+    // will this ever run?
+    match booksDB with 
+    | Some db -> db.DbConn.Close()
+    | None -> ()
     0

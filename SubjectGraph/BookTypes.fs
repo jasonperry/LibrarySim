@@ -69,7 +69,8 @@ type BooksDB (dbFileName) =
         let connection = new SQLiteConnection(connectionString)
         connection
 
-    member private this.DbConn with get() = dbConn
+    // Not private so the browser program can open it once for all.
+    member this.DbConn with get() = dbConn
 
     /// Open database and create the tables.
     member private this.InitDB () = 
@@ -101,6 +102,7 @@ type BooksDB (dbFileName) =
         use ccmd3 = new SQLiteCommand(linksTableCmd, this.DbConn)
         let c3res = ccmd3.ExecuteNonQuery()
         printfn "Initialized connection, %d, %d, %d rows affected" c1res c2res c3res
+        // Close is done at the end of AddBooks.
         
     member this.AddBooks (books: seq<BookRecord>) = 
         this.InitDB() 
@@ -240,15 +242,63 @@ type BooksDB (dbFileName) =
         // this.DbConn.Close() // this was causing the trouble
         res
 
+    member this.BooksForSubject (subjectUri: System.Uri) = 
+        // could it be faster if I prep the query and store it with the subjectNode?
+        // ... a thunk!
+        let bookQueryStr = 
+            "SELECT title, books.bookUri, authors, year, LCCallNumber, LCItemNumber " +
+            "FROM books INNER JOIN subjects ON books.bookUri = subjects.bookUri " +
+            "WHERE subjects.subjectUri = @subjectUri "
+        use bookQuery = new SQLiteCommand(bookQueryStr, this.DbConn)
+        bookQuery.Parameters.AddWithValue("@subjectUri", 
+            subjectUri.ToString()) |> ignore
+        // fun () -> 
+        let transaction = this.DbConn.BeginTransaction()
+        let booksReader = bookQuery.ExecuteReader()
+        let result = seq {
+            while booksReader.Read() do
+                // printfn ("Read a book result")
+                let bookUriStr = booksReader.["bookUri"].ToString()
+                let linksQueryStr = 
+                    sprintf
+                        "SELECT link FROM bookLinks WHERE bookUri = '%s'" bookUriStr
+                use linksQueryCmd = new SQLiteCommand(linksQueryStr, this.DbConn)
+                let linksReader = linksQueryCmd.ExecuteReader()
+                // let subjects = new List<string * System.Uri option>()
+                let links = 
+                    seq {
+                        while linksReader.Read() do 
+                            yield linksReader.["link"].ToString()
+                    } 
+                    |> List.ofSeq
+                yield { 
+                    Title = booksReader.["title"].ToString()
+                    Authors = booksReader.["authors"].ToString()
+                    Uri = System.Uri(bookUriStr)
+                    LCCallNumFields = struct {|
+                        a = booksReader.["LCCallNumber"].ToString()
+                        b = booksReader.["LCItemNumber"].ToString()
+                    |}
+                    Subjects = new List<_>()
+                    Year = match int (booksReader.["year"].ToString()) with 
+                           | 0 -> None 
+                           | yr -> Some yr
+                    Links = links
+                }
+        }
+        transaction.Commit()
+        result
+
     interface System.IDisposable with
         member this.Dispose () =
             this.DbConn.Close()
+// end class BooksDB
 
-
+/// Detect the type of book persistence and load the database.
 let loadBooks (filename: string) = 
     if filename.EndsWith "sqlite" then 
         let bookDB = new BooksDB(filename)  // got an error with "use"
-        bookDB.LoadAllBooks ()
+        bookDB.LoadAllBooks()
     else
         let formatter = BinaryFormatter()
         let stream = new FileStream(filename, FileMode.Open)
