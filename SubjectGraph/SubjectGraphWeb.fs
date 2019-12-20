@@ -155,7 +155,7 @@ module BooksResult =
 
   let ofNode (node : SubjectNode) = {
     thisSubject = SubjectInfo.OfSubjectNode node
-    // Sorting assumes there's a call number.
+    // Sorting assumes there's a call number, which there will be if it's in the graph
     books = node.books
         |> Seq.sortBy (fun (br : BookRecord) -> br.LCCallNum.Value) 
         |> List.ofSeq

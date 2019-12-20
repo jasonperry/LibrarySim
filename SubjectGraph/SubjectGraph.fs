@@ -393,6 +393,74 @@ let rec isBroaderSubject (graph: SubjectGraph) (uri1: Uri) (uri2: Uri) =
     else 
         Seq.exists (fun (n: SubjectNode) -> isBroaderSubject graph uri1 n.uri) node2.broader
 
+(* Functions relating to adding items ************************************* *)
+
+/// Add a book to the graph by call number, returning updated item record if 
+/// successful.
+let linkItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
+    match item.LCCallNum with
+    | None -> None
+    | Some cn -> 
+        // This is the tricky part. It's different from adding a subject.
+        let rec findItemParent atnode = 
+            let candidates = 
+                Seq.filter (fun nd -> if Option.isNone nd.callNumRange then false
+                                      else CNRange.contains nd.callNumRange.Value cn) 
+                           atnode.narrower
+                |> List.ofSeq
+            match candidates with 
+            | head :: rest -> // probably only one match. Recurse unless it's a leaf.
+                if Seq.isEmpty head.narrower then head // a little weird to "check down"
+                else findItemParent head
+            | [] -> // No containment, use the the rightmost <= node.
+                // I hoped it was already sorted, but this appears to fix a bug.
+                let sorted = Seq.sortBy (fun (nd: SubjectNode) -> nd.callNumRange.Value.startCN)
+                                atnode.narrower
+                match (Seq.tryFindBack (fun (nd: SubjectNode) -> 
+                                            nd.callNumRange.Value.startCN <= cn) 
+                                       sorted) with
+                | Some nd -> nd
+                | None -> atnode
+        let parentNode = findItemParent graph.topNode
+        // parentNode.books.Add item  // Nope, stays in the DB!
+        let rec updateCounts node = 
+            node.booksUnder <- node.booksUnder + 1
+            Seq.iter updateCounts node.broader
+        updateCounts parentNode
+        Logger.Info "Item added under %s" parentNode.name
+        Some (parentNode.name, parentNode.uri)
+        // leave updating the bookRecord to the caller. SubjectGraph shouldn't touch items.
+        //BookRecord.updateSubject item (parentNode.name, parentNode.uri) |> Some
+
+
+/// Add a set of item records to graph, and update them with subject URIs.
+let linkBooksToGraph (graph: SubjectGraph) (books: seq<BookRecord>) = 
+    let skippedCallLetters = [ "YA"; ]
+    // new version takes an already-loaded sequence
+    // // processBookRecords (getRecordSeq (getXmlReader xmlFilename))
+    // This is where we can only add books with parsed call numbers.
+    books
+    |> Seq.filter (fun r -> 
+        Option.isSome r.LCCallNum 
+        && 
+        let cnLetters = r.LCCallNum.Value.letters
+        if (List.contains cnLetters skippedCallLetters) then
+            Logger.Info "Skipping special collection item %s" cnLetters
+            false
+        else true)
+    |> Seq.filter (fun br -> 
+        let upd = linkItemByCallNumber graph br
+        match upd with 
+        | None -> 
+            // printfn "no update done"
+            false
+        | Some (sname, siter) -> 
+            // printfn "Should be updating book..."
+            br.UpdateSubject (sname, siter) 
+            true)
+    // Top level will save updated books.
+
+
 (******** Stuff below here is old: SPARQL querying functions and CLI. *******)
 
 // Not used by addSubjectByCN (but may be added back for more logic)
@@ -518,40 +586,7 @@ let rec addSubjectLCSH (graph: SubjectGraph) (label: string) (callLetters : stri
         // Then add this to the broader's narrower list. 
         // Also a query to get variant names; add them to the hash table 
 
-/// Add a book to the graph by call number, returning updated item record if 
-/// successful.
-let addItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
-    match item.LCCallNum with
-    | None -> None
-    | Some cn -> 
-        let rec findItemParent atnode = 
-            let candidates = 
-                Seq.filter (fun nd -> if Option.isNone nd.callNumRange then false
-                                      else CNRange.contains nd.callNumRange.Value cn) 
-                           atnode.narrower
-                |> List.ofSeq
-            match candidates with 
-            | head :: rest -> // probably only one match. Recurse unless it's a leaf.
-                if Seq.isEmpty head.narrower then head // a little weird to "check down"
-                else findItemParent head
-            | [] -> // No containment, use the the rightmost <= node.
-                // I hoped it was already sorted, but this appears to fix a bug.
-                let sorted = Seq.sortBy (fun (nd: SubjectNode) -> nd.callNumRange.Value.startCN)
-                                atnode.narrower
-                match (Seq.tryFindBack (fun (nd: SubjectNode) -> 
-                                            nd.callNumRange.Value.startCN <= cn) 
-                                       sorted) with
-                | Some nd -> nd
-                | None -> atnode
-        let parentNode = findItemParent graph.topNode
-        parentNode.books.Add item
-        let rec updateCounts node = 
-            node.booksUnder <- node.booksUnder + 1
-            Seq.iter updateCounts node.broader
-        updateCounts parentNode
-        printfn "...added under %s" parentNode.name
-        BookRecord.updateSubject item (parentNode.name, parentNode.uri) 
-        |> Some
+
 
 /// Add a book's subjects to a graph (and the book too if selected)
 /// NOT CURRENTLY USED for CN-based graph. Broken due to change

@@ -62,8 +62,8 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
         let mutable title = None
         let mutable subtitle = None
         let mutable authors = None 
-        let mutable lcCallNum = None
-        let mutable lcLetters = None
+        let mutable lcCallNumA = ""
+        let mutable lcCallNumB = ""
         let mutable year = None
         let links = new List<string>()
         let subjects = new List<string * System.Uri option>()
@@ -100,19 +100,10 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
             // some books have multiple call letters. This will take the last only.
             // TODO: make it a mutable list and append.
             elif datafield.Tag = "050" then
-                let (sfa, sfb) = (getSingleSubfield datafield "a", getSingleSubfield datafield "b")
-                let cn = sfa.Value + (sfb |? "")
-                printfn "Call Number: %s" cn
-                try 
-                    lcCallNum <- Some (LCCN.parse cn)
-                    lcLetters <- Some (lcCallNum.Value.letters)
-                    withCallNum <- withCallNum + 1
-                with 
-                    // If the call number is letters (gutenberg), detect and store.
-                    | CallNumberException errorstr -> 
-                        if LCCN.isCNLetters cn then 
-                            lcLetters <- Some cn
-                        else printfn "(!!) %s" errorstr
+                lcCallNumA <- getSingleSubfield datafield "a" |? ""
+                lcCallNumB <- getSingleSubfield datafield "b" |? ""
+                // let cn = sfa.Value + (sfb |? "")
+                printfn "Call Number: %s" (lcCallNumA + lcCallNumB)
             elif datafield.Tag = "82" then
                 let dcn = getSingleSubfield datafield "a"
                 //printfn "Dewey Call number: %s" dcn.Value
@@ -135,8 +126,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
                          | None -> ""
                         )
                 Authors = authors |? "" 
-                LCCallNum = lcCallNum
-                LCLetters = lcLetters
+                LCCallNumFields = struct {| a = lcCallNumA; b = lcCallNumB |}
                 Year = year
                 Subjects = subjects
                 // To be more general, do I only want a URI when I add it to the graph?
@@ -156,24 +146,5 @@ let processBooks xmlFilename =
     let allbooks = processBookRecords (getRecordSeq (getXmlReader xmlFilename))
     // BookTypes.saveBooks allbooks recordsFileName
     //printfn "Wrote records to file %s" recordsFileName
-    let bookDB = new BookTypes.BooksDB (OUTDIR + "books.sqlite")
-    let numAdded = bookDB.AddBooks (List.ofSeq allbooks)
-    printfn "Wrote %d books to database" numAdded
-
-/// top-level function for parsing MarcXML item records and adding to the graph.
-/// TODO: Move to SubjectGraph. No! just make it get the Subject URI.
-let addBooksToClassGraph (graph: SubjectGraph) xmlFilename = 
-    let skippedCallLetters = [ "YA"; ]
-    processBookRecords (getRecordSeq (getXmlReader xmlFilename))
-    // This is where we can only add books with parsed call numbers.
-    |> Seq.filter 
-        (fun r -> 
-            Option.isSome r.LCCallNum 
-            && 
-            let cnLetters = r.LCCallNum.Value.letters
-            if (List.contains cnLetters skippedCallLetters) then
-                printfn "Skipping special collection item %s" cnLetters
-                false
-            else true)
-    |> Seq.iter (fun br -> SubjectGraph.addItemByCallNumber graph br |> ignore)
-    ()
+    saveBooks allbooks (OUTDIR + "books.sqlite")
+    // printfn "Wrote %d books to database" numAdded

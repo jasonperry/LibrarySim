@@ -19,14 +19,18 @@ let main argv =
   | "buildLCClassGraph" -> 
       BuildLCClassGraph.buildGraph argv.[1] (OUTDIR + "ClassGraph.sgb")
       0
-  | "addBooksToClassGraph" -> 
+  | "linkBooksToGraph" -> 
       let graph = loadGraph argv.[1]
       let outGraphName = 
           if argv.Length > 3 then 
               argv.[3] 
-          else "output/BooksAndClassGraph.sgb"
-      addBooksToClassGraph graph argv.[2]
-      saveGraph graph outGraphName
+          else (OUTDIR + "BooksAndClassGraph.sgb")
+      // Everything uses seq's, so just chain it together.
+      argv.[2]
+      |> loadBooks
+      |> linkBooksToGraph graph
+      |> saveBookUpdates argv.[2]
+      saveGraph graph outGraphName  // it still modifies the graph...
       printfn "Saved graph with books as %s" outGraphName
       0
   | "cullGraph" ->
@@ -78,7 +82,7 @@ let main argv =
       let books = BookTypes.loadBooks argv.[1]
       let sortedBooks = BookTypes.sortBooksByCallLetters books
       for book in sortedBooks do 
-          printfn "%s : %s" (BookRecord.getLCCNString book) book.Title
+          printfn "%s : %s" book.LCCNString book.Title
       0
   (* | "buildGutenGraph" ->
       // any way to detect if records.brb is up to date? Not bothering yet!
