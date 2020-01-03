@@ -319,7 +319,7 @@ module SubjectGraph =
         numRemoved
     
     /// If a subtree has a small number of books, pull them all up into the root
-    let collapseGraph graph thresh = 
+    let collapseGraph graph booksDB thresh = 
         // Return a list of all items below a list of nodes.
         let rec harvestItems nodelist = 
             Seq.collect

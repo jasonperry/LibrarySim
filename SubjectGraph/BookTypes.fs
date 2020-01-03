@@ -158,9 +158,12 @@ type BooksDB (dbFileName) =
         let allBooks = new System.Collections.Generic.List<_>(books)
         use startCmd = new SQLiteCommand("BEGIN", this.DbConn)
         startCmd.ExecuteNonQuery() |> ignore
-        let updateSubjectsCommand = 
+        (* let updateSubjectsCommand = 
             "UPDATE subjects SET subjectName=@subjectName, subjectUri=@subjectUri " +
-            "WHERE bookUri=@bookUri"
+            "WHERE bookUri=@bookUri" *)
+        let updateSubjectsCommand = 
+            "INSERT INTO subjects (subjectName, subjectUri, bookUri) " +
+            "VALUES (@subjectName, @subjectUri, @bookUri)"
         printfn "--> Updating subjects for %d books..." allBooks.Count
         let resLength = 
             allBooks
@@ -168,13 +171,15 @@ type BooksDB (dbFileName) =
                 // printfn "Book now has %d subjects" br.Subjects.Count
                 br.Subjects
                 |> Seq.iter (fun (subjName, subjLink) -> 
-                    use command = new SQLiteCommand(updateSubjectsCommand, this.DbConn)
-                    command.Parameters.AddWithValue("@subjectName", subjName) |> ignore
-                    command.Parameters.AddWithValue("@subjectUri", 
-                        Option.defaultValue null subjLink) |> ignore
-                    command.Parameters.AddWithValue("@bookUri", br.Uri) |> ignore
-                    // printfn "Constructed update command: %s" (command.ToString())
-                    command.ExecuteNonQuery() |> ignore )
+                    match subjLink with  // Only need to add if there's a link.
+                    | Some subjLinkValue ->
+                        use command = new SQLiteCommand(updateSubjectsCommand, this.DbConn)
+                        command.Parameters.AddWithValue("@subjectName", subjName) |> ignore
+                        command.Parameters.AddWithValue("@subjectUri", subjLinkValue) |> ignore
+                        command.Parameters.AddWithValue("@bookUri", br.Uri) |> ignore
+                        // printfn "Constructed update command: %s" (command.ToString())
+                        command.ExecuteNonQuery() |> ignore 
+                    | None -> () )
             ) |> Seq.length
         use command = new SQLiteCommand("END", this.DbConn)
         command.ExecuteNonQuery() |> ignore

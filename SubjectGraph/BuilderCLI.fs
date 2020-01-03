@@ -21,42 +21,47 @@ let main argv =
       0
   | "linkBooksToGraph" -> 
       let graph = loadGraph argv.[1]
+      let booksDBFile = argv.[2]
       let outGraphName = 
           if argv.Length > 3 then 
               argv.[3] 
           else (OUTDIR + "BooksAndClassGraph.sgb")
       // Everything uses seq's, so just chain it together.
-      argv.[2]
-      |> loadBooks
-      |> linkBooksToGraph graph
-      |> saveBookUpdates argv.[2]
+      // Uhh, but it's too slow. Maybe separating is faster?
+      let updatedBooks = 
+        booksDBFile
+        |> loadBooks
+        |> linkBooksToGraph graph
+      saveBookUpdates booksDBFile updatedBooks
       saveGraph graph outGraphName  // it still modifies the graph...
       printfn "Saved graph with books as %s" outGraphName
       0
   | "cullGraph" ->
-        let graph = loadGraph argv.[1]
-        let removed = SubjectGraph.cullGraph graph
-        printfn "Removed %d nodes from graph, saving..." removed
-        saveGraph graph "output/CulledGraph.sgb"
-        0
-  | "collapseGraph" ->
-        let graph = loadGraph argv.[1]
-        let outGraphName = "output/CollapsedGraph.sgb"
-        printfn "Loaded graph %s" argv.[1]
-        SubjectGraph.collapseGraph graph (int argv.[2])
-        printfn "Saving culled graph %s" outGraphName
-        saveGraph graph outGraphName
-        0
-  | "cullapseGraph" ->
+      let graph = loadGraph argv.[1]
+      let removed = SubjectGraph.cullGraph graph
+      printfn "Removed %d nodes from graph, saving..." removed
+      saveGraph graph "output/CulledGraph.sgb"
+      0
+  | "collapseGraph" ->  // <graphFile> <bookdb> <cutoff>
+      let graph = loadGraph argv.[1]
+      let booksDB = new BooksDB(argv.[2])
+      let outGraphName = "output/CollapsedGraph.sgb"
+      printfn "Loaded graph %s" argv.[1]
+      SubjectGraph.collapseGraph graph booksDB (int argv.[3])
+      printfn "Saving culled graph %s" outGraphName
+      saveGraph graph outGraphName
+      0
+  (*| "cullapseGraph" ->  // <graphFile> <bookDB>
       let graph = loadGraph argv.[1]
       let outGraphName = "output/CullapsedGraph.sgb"
       printfn "Loaded graph %s" argv.[1]
-      SubjectGraph.collapseGraph graph (int argv.[2])
+      let booksDB = new BooksDB(argv.[2])
+      SubjectGraph.collapseGraph graph booksDB (int argv.[3])
       let removed = SubjectGraph.cullGraph graph
       printfn "Removed %d nodes; saving collapsed/culled graph %s" removed outGraphName
       saveGraph graph outGraphName
-      0
-  | "contractGraph" ->
+      0 *)
+  | "contractGraph" ->  // <graphFile> TODO: <bookDB>
       let graph = loadGraph argv.[1]
       let outGraphName = "output/ContractedGraph.sgb"
       SubjectGraph.contractGraph graph
@@ -67,7 +72,8 @@ let main argv =
       let graph = loadGraph argv.[1]
       let outGraphName = "output/MinimizedGraph.sgb"
       printfn "Loaded graph %s" argv.[1]
-      SubjectGraph.collapseGraph graph (int argv.[2]) // threshold
+      let booksDB = new BooksDB(argv.[2])
+      SubjectGraph.collapseGraph graph booksDB (int argv.[2]) // threshold
       let removed = SubjectGraph.cullGraph graph
       SubjectGraph.contractGraph graph // TODO : removed 2, add them together.
       printfn "Removed %d nodes; saving minimized graph %s" removed outGraphName
