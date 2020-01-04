@@ -230,10 +230,11 @@ type BooksDB (dbFileName) =
                     Title = booksReader.["title"].ToString()
                     Authors = booksReader.["authors"].ToString()
                     Uri = System.Uri(bookUriStr)
-                    LCCallNumFields = struct {|
-                        a = booksReader.["LCCallNumber"].ToString()
-                        b = booksReader.["LCItemNumber"].ToString()
-                    |}
+                    LCCallNumFields = 
+                        struct {|
+                                  a = booksReader.["LCCallNumber"].ToString()
+                                  b = booksReader.["LCItemNumber"].ToString()
+                        |}
                     Subjects = subjects
                     Year = match int (booksReader.["year"].ToString()) with 
                            | 0 -> None 
@@ -280,10 +281,11 @@ type BooksDB (dbFileName) =
                     Title = booksReader.["title"].ToString()
                     Authors = booksReader.["authors"].ToString()
                     Uri = System.Uri(bookUriStr)
-                    LCCallNumFields = struct {|
-                        a = booksReader.["LCCallNumber"].ToString()
-                        b = booksReader.["LCItemNumber"].ToString()
-                    |}
+                    LCCallNumFields = 
+                        struct {|
+                                  a = booksReader.["LCCallNumber"].ToString()
+                                  b = booksReader.["LCItemNumber"].ToString()
+                        |}
                     Subjects = new List<_>()
                     Year = match int (booksReader.["year"].ToString()) with 
                            | 0 -> None 

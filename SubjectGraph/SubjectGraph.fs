@@ -334,10 +334,11 @@ module SubjectGraph =
         collapse' graph.topNode
 
     /// Shorten long paths by eliminating nodes with one child and no books.
-    let contractGraph graph = 
+    let contractGraph graph (booksDB: BooksDB) = 
         let mutable removedCount = 0
         let rec contract' node depth = 
-            if node.narrower.Count = 1 && node.books.Count = 0
+            if node.narrower.Count = 1 && 
+                Seq.isEmpty (booksDB.BooksForSubject node.uri)
             then
                 let child = node.narrower.[0]
                 printfn "Removing node (%s) with child (%s) at depth %d" 

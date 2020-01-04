@@ -38,9 +38,10 @@ let main argv =
       0
   | "cullGraph" ->
       let graph = loadGraph argv.[1]
+      let outGraphName = "output/CulledGraph.sgb"
       let removed = SubjectGraph.cullGraph graph
-      printfn "Removed %d nodes from graph, saving..." removed
-      saveGraph graph "output/CulledGraph.sgb"
+      printfn "Removed %d nodes from graph, saving %s" removed outGraphName
+      saveGraph graph outGraphName
       0
   | "collapseGraph" ->  // <graphFile> <bookdb> <cutoff>
       let graph = loadGraph argv.[1]
@@ -61,10 +62,13 @@ let main argv =
       printfn "Removed %d nodes; saving collapsed/culled graph %s" removed outGraphName
       saveGraph graph outGraphName
       0 *)
-  | "contractGraph" ->  // <graphFile> TODO: <bookDB>
+  | "contractGraph" ->  // <graphFile> <bookDB>
       let graph = loadGraph argv.[1]
+      let booksDB = new BooksDB(argv.[2])
+      booksDB.DbConn.Open()  // should I make a destructor?
       let outGraphName = "output/ContractedGraph.sgb"
-      SubjectGraph.contractGraph graph
+      SubjectGraph.contractGraph graph booksDB
+      booksDB.DbConn.Close()
       printfn "Saving contracted graph %s" outGraphName
       saveGraph graph outGraphName
       0
@@ -72,10 +76,13 @@ let main argv =
       let graph = loadGraph argv.[1]
       let outGraphName = "output/MinimizedGraph.sgb"
       printfn "Loaded graph %s" argv.[1]
-      let booksDB = new BooksDB(argv.[2])
-      SubjectGraph.collapseGraph graph booksDB (int argv.[2]) // threshold
+      // UPDATE: Need to cull before contract
       let removed = SubjectGraph.cullGraph graph
-      SubjectGraph.contractGraph graph // TODO : removed 2, add them together.
+      let booksDB = new BooksDB(argv.[2])
+      booksDB.DbConn.Open()
+      SubjectGraph.collapseGraph graph booksDB (int argv.[3]) // threshold
+      SubjectGraph.contractGraph graph booksDB // TODO : removed 2, add them together.
+      booksDB.DbConn.Close()
       printfn "Removed %d nodes; saving minimized graph %s" removed outGraphName
       saveGraph graph outGraphName
       0
