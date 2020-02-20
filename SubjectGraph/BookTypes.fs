@@ -39,7 +39,7 @@ type BookRecord = {
 
     /// Replace the subject information for a book with a new record.
     member this.UpdateSubject (subjName, subjLink : System.Uri) = 
-        match List.tryFindIndex 
+        match List.tryFindIndex  // Remove any existing subject with matching name OR Uri.
             (fun (name, uriOpt) -> 
                 name = subjName ||
                 match uriOpt with 

@@ -8,7 +8,7 @@ open MarcXmlToBooks
 open Mods
 open System
 
-let OUTDIR = __SOURCE_DIRECTORY__ + @"\output\"
+let OUTDIR = __SOURCE_DIRECTORY__ + @"/output/"
 
 [<EntryPoint>]
 let main argv =
@@ -23,8 +23,7 @@ let main argv =
       let graph = loadGraph argv.[1]
       let booksDBFile = argv.[2]
       let outGraphName = 
-          if argv.Length > 3 then 
-              argv.[3] 
+          if argv.Length > 3 then argv.[3] 
           else (OUTDIR + "BooksAndClassGraph.sgb")
       // Everything uses seq's, so just chain it together.
       // Uhh, but it's too slow. Maybe separating is faster?
@@ -38,7 +37,7 @@ let main argv =
       0
   | "cullGraph" ->
       let graph = loadGraph argv.[1]
-      let outGraphName = "output/CulledGraph.sgb"
+      let outGraphName = OUTDIR + "CulledGraph.sgb"
       let removed = SubjectGraph.cullGraph graph
       printfn "Removed %d nodes from graph, saving %s" removed outGraphName
       saveGraph graph outGraphName
@@ -46,7 +45,7 @@ let main argv =
   | "collapseGraph" ->  // <graphFile> <bookdb> <cutoff>
       let graph = loadGraph argv.[1]
       let booksDB = new BooksDB(argv.[2])
-      let outGraphName = "output/CollapsedGraph.sgb"
+      let outGraphName = OUTDIR + "CollapsedGraph.sgb"
       printfn "Loaded graph %s" argv.[1]
       SubjectGraph.collapseGraph graph booksDB (int argv.[3])
       printfn "Saving culled graph %s" outGraphName
@@ -66,7 +65,7 @@ let main argv =
       let graph = loadGraph argv.[1]
       let booksDB = new BooksDB(argv.[2])
       booksDB.DbConn.Open()  // should I make a destructor?
-      let outGraphName = "output/ContractedGraph.sgb"
+      let outGraphName = OUTDIR + "ContractedGraph.sgb"
       SubjectGraph.contractGraph graph booksDB
       booksDB.DbConn.Close()
       printfn "Saving contracted graph %s" outGraphName
@@ -74,7 +73,7 @@ let main argv =
       0
   | "minimizeGraph" -> // do all the things.
       let graph = loadGraph argv.[1]
-      let outGraphName = "output/MinimizedGraph.sgb"
+      let outGraphName = OUTDIR + "MinimizedGraph.sgb"
       printfn "Loaded graph %s" argv.[1]
       // UPDATE: Need to cull before contract
       let removed = SubjectGraph.cullGraph graph
