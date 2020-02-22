@@ -144,7 +144,7 @@ let processBookRecords (records : MarcXmlType.Record seq) = //(data : Marc21Type
 let processBooks xmlFilename = 
     // let allbooks = processRecords (Marc21Type.Parse (File.ReadAllText xmlfile))
     let allbooks = processBookRecords (getRecordSeq (getXmlReader xmlFilename))
+    allbooks
     // BookTypes.saveBooks allbooks recordsFileName
     //printfn "Wrote records to file %s" recordsFileName
-    saveBooks allbooks (OUTDIR + "books.sqlite")
     // printfn "Wrote %d books to database" numAdded

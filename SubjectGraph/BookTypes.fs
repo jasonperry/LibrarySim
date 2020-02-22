@@ -73,7 +73,7 @@ type BooksDB (dbFileName) =
     member this.DbConn with get() = dbConn
 
     /// Open database and create the tables.
-    member private this.InitDB () = 
+    member this.InitDB () = 
         let bookTableCmd = 
             "CREATE TABLE books (" +
             "title TEXT NOT NULL, " +
@@ -102,10 +102,11 @@ type BooksDB (dbFileName) =
         use ccmd3 = new SQLiteCommand(linksTableCmd, this.DbConn)
         let c3res = ccmd3.ExecuteNonQuery()
         printfn "Initialized connection, %d, %d, %d rows affected" c1res c2res c3res
-        // Close is done at the end of AddBooks.
+        // Close is now done here to make this self-contained.
+        this.DbConn.Close()
         
     member this.AddBooks (books: seq<BookRecord>) = 
-        this.InitDB() 
+        // this.InitDB()  // caller decides whether to do this.
         let insertBookCommand = 
             "INSERT INTO books (title, bookUri, authors, year, LCCallNumber, LCItemNumber) " +
             "VALUES (@title, @bookUri, @authors, @year, @LCCallNumber, @LCItemNumber)"
@@ -313,12 +314,14 @@ let loadBooks (filename: string) =
         stream.Close()
         bookSeq
 
-let saveBooks (books: seq<BookRecord>) (filename: string) = 
+let saveBooks (books: seq<BookRecord>) (filename: string) append = 
     if filename.EndsWith "sqlite" then 
         use bookDB = new BooksDB(filename)
+        if not append then bookDB.InitDB()
+        bookDB.DbConn.Open()
         let numAdded = bookDB.AddBooks books
         printfn "Wrote %d books to database %s" numAdded filename
-    else
+    else  // To be eliminated? SQLite DB seems to be working out okay.
         let formatter = BinaryFormatter()
         let stream = new FileStream(filename, FileMode.Create)
         formatter.Serialize(stream, books)

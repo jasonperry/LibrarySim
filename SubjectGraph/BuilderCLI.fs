@@ -27,6 +27,7 @@ let main argv =
           else (OUTDIR + "BooksAndClassGraph.sgb")
       // Everything uses seq's, so just chain it together.
       // Uhh, but it's too slow. Maybe separating is faster?
+      // Or still a transaction issue?
       let updatedBooks = 
         booksDBFile
         |> loadBooks
@@ -85,8 +86,11 @@ let main argv =
       printfn "Removed %d nodes; saving minimized graph %s" removed outGraphName
       saveGraph graph outGraphName
       0
-  | "processBooks" ->
-      MarcXmlToBooks.processBooks argv.[1]
+  | "addBooksToDB" ->
+      let marcXmlFile = if argv.[1] = "-A" then argv.[2] else argv.[1]
+      let append = argv.[1] = "-A"
+      let bookRecords = MarcXmlToBooks.processBooks marcXmlFile
+      BookTypes.saveBooks bookRecords (OUTDIR + "books.sqlite") append
       0
   | "printBooks" -> 
       // TODO: have sort-by command-line options -scl, -scn, etc.
