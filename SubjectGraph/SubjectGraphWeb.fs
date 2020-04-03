@@ -37,6 +37,8 @@ type SubjectInfo = {
 /// ...should it contain a pointer to the books? or back to the node itself?
 type SubjectsResult = {
   thisSubject : SubjectInfo;
+  prevSubject : Uri Option;
+  nextSubject : Uri Option;
   broader : SubjectInfo list;
   narrower : SubjectInfo list;
   cnRange : string;
@@ -44,25 +46,8 @@ type SubjectsResult = {
 }
 
 module SubjectsResult = 
-  let ofNode (node : SubjectNode) = {
-    thisSubject = {
-        uri = Some node.uri; 
-        cnRange = node.callNumRange; 
-        name = node.name;
-        itemsUnder = node.booksUnder
-    };
-    broader = node.broader 
-      |> Seq.map SubjectInfo.OfSubjectNode
-      |> List.ofSeq;
-      // Q: Is there a way to cast this to not convert the whole list? I've tried...
-    narrower = node.narrower 
-      |> Seq.map SubjectInfo.OfSubjectNode
-      |> List.ofSeq
-      |> List.sortWith (fun (si1: SubjectInfo) si2 -> 
-                            CNRange.compare si1.cnRange si2.cnRange)
-    cnRange = node.cnString |? ""
-    seeAlso = node.seeAlso
-  }
+  // let ofNode (node : SubjectNode) =  // now in buildSubjectsResult
+
   let nodeListToInfoList (nodes: SubjectNode list) = 
       List.map 
           (fun (nd: SubjectNode) -> {
@@ -86,7 +71,7 @@ module SubjectsResult =
                              (si.name + " (" + string si.itemsUnder + ")")
       + "</td>"
 
-  let crossrefInfoToHtml appUrl (cr : CrossrefInfo) = 
+  let crossrefInfoToHtml (cr : CrossrefInfo) = 
     (cr
     |> List.map 
         (fun (desc, range, uriOpt) -> 
@@ -97,8 +82,9 @@ module SubjectsResult =
             // + "</li>" )
     |> String.concat "<br/>")
     // + "</bl>"
-
-  let toHtml appUrl (sr : SubjectsResult) = 
+  
+  /// Render SubjectsResult as HTML. Maybe use a template later.
+  let toHtml (sr : SubjectsResult) = 
       (if List.isEmpty sr.broader then ""
        else
           "<table><tr><td>Up: </td>" 
@@ -106,11 +92,17 @@ module SubjectsResult =
           + "</td></tr></table>")
       + "<h2>" + sr.cnRange + " " + HttpUtility.HtmlEncode(sr.thisSubject.name) + "</h2>"  
       //+ "<p>Call number range: " + sr.cnRange + "<br />"
-      + "<p>Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
       +  match sr.seeAlso with 
          | [] -> ""
-         | sa -> "<p> <b>Cross references:</b><br/>" + crossrefInfoToHtml appUrl sa + "</p>"
-      + "</p><table><tr>"
+         | sa -> "<p> <b>Cross references:</b><br/>" + crossrefInfoToHtml sa + "</p>"
+      + (match sr.prevSubject with
+          | Some prevUri -> "<a href=\"browse?uri=" + string (prevUri) + "\">&lt Prev subject</a> | "
+          | None -> "")
+      + (match sr.nextSubject with
+          | Some nextUri -> "<a href=\"browse?uri=" + string (nextUri) + "\">Next subject &gt;</a>"
+          | None -> "")
+      + "<p>Items under this heading: " + (string sr.thisSubject.itemsUnder) + "</p>"
+      + "<table><tr>"
       + String.concat "</tr><tr>" (List.map subjectInfoToHtml sr.narrower)
       + "</tr><table>"
 
@@ -124,9 +116,33 @@ module SubjectsResult =
 
 // TODO: monadize the error handling.  -> WebResult string
 // The ^^ is the "request combinator"
-let getSubjectResult g uri = 
+let buildSubjectsResult g uri = 
       // TODO: error handling
-      SubjectsResult.ofNode g.uriIndex.[uri]
+      // Maybe don't have "ofNode" at all, just build the whole thing here.
+      let node = g.uriIndex.[uri]
+      {
+        thisSubject = {
+          uri = Some node.uri; 
+          cnRange = node.callNumRange; 
+          name = node.name;
+          itemsUnder = node.booksUnder
+        };
+        prevSubject = SubjectGraph.prevNode g g.uriIndex.[uri] 
+          |> Option.bind (fun nd -> Some nd.uri) 
+        nextSubject = SubjectGraph.nextNode g g.uriIndex.[uri]
+          |> Option.bind (fun nd -> Some nd.uri) 
+        broader = node.broader 
+          |> Seq.map SubjectInfo.OfSubjectNode
+          |> List.ofSeq;
+          // Q: Is there a way to cast this to not convert the whole list? I've tried...
+        narrower = node.narrower 
+          |> Seq.map SubjectInfo.OfSubjectNode
+          |> List.ofSeq
+          |> List.sortWith (fun (si1: SubjectInfo) si2 -> 
+            CNRange.compare si1.cnRange si2.cnRange)
+        cnRange = node.cnString |? ""
+        seeAlso = node.seeAlso
+      }
 
 let getSubjectSearchResult (g : SubjectGraph) q = 
     // printf "Doing search..."
@@ -233,7 +249,7 @@ let dispatch g booksDB =
           >=> setMimeType "text/json; charset=utf-8"
           >=> request (fun r -> 
                 withQueryUri r.query (fun uri ->
-                    getSubjectResult g uri
+                    buildSubjectsResult g uri
                     |> JsonConvert.SerializeObject) )
           path "/books" 
           >=> setMimeType "text/json; charset=utf-8"
@@ -247,19 +263,18 @@ let dispatch g booksDB =
                 match r.query with
                 // If no query, redirect to the top node.
                 | [] -> 
-                  Redirection.see_other 
-                      ("/browse?uri=" + string (g.topNode.uri))
+                  Redirection.see_other ("/browse?uri=" + string (g.topNode.uri))
                 | _  -> 
                   withQueryUri r.query (fun uri ->
                       (pageHeader r 
-                       + SubjectsResult.toHtml 
-                         (r.url.GetLeftPart(System.UriPartial.Authority))
-                         (getSubjectResult g uri)
-                       + "<hr>"
-                       + match booksDB with 
-                         | Some db -> BooksResult.toHtml (getBookResult g uri db)
-                         | None -> ""
-                       + "</body></html>")) )
+                        + SubjectsResult.toHtml 
+                            (* (r.url.GetLeftPart(System.UriPartial.Authority)) *)  // shouldn't be needed.
+                            (buildSubjectsResult g uri)
+                        + "<hr>"
+                        + match booksDB with 
+                          | Some db -> BooksResult.toHtml (getBookResult g uri db)
+                          | None -> ""
+                        + "</body></html>")) )
           path "/searchsubj"
           >=> setMimeType "text/html; charset=utf-8"
           >=> request (fun r -> 

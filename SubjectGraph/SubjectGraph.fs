@@ -29,6 +29,10 @@ type SubjectNode = {
 
 /// Utility functions for individual SubjectNodes.
 module SubjectNode =
+    // TODO: Add a post-processing function to sort the whole graph!
+    let sortedChildren nd = 
+        Seq.sortBy (fun (nd: SubjectNode) -> nd.callNumRange.Value.startCN)
+                   nd.narrower // Caller can convert to list if needed.
     // TODO: These are now specific to subdividedNames, so go elsewhere?
     let isNarrower node1 node2 = 
         isStrictPrefix node2.subdividedName node1.subdividedName
@@ -233,7 +237,32 @@ module SubjectGraph =
                 |> searchParent
             | [] -> atnode
         searchParent graph.topNode
+
+    /// Go to the next sibling node, if it exists.
+    let nextNode graph (nd: SubjectNode) = 
+        // if it has children, take the first.
+        (*if nd.narrower.Count > 0 then 
+            Some (Seq.toArray (SubjectNode.sortedChildren nd)).[0] 
+        // otherwise, take the next child of the parent if possible.
+        else *)
+        if nd.broader.Count > 0 then
+            let siblings = Array.ofSeq (SubjectNode.sortedChildren nd.broader.[0])
+            let myIndex = Array.findIndex (fun n -> n = nd) siblings
+            if siblings.Length > myIndex+1 then Some siblings.[myIndex+1]
+            else None
+        // has no parent; we're at the top.
+        else None
+        // Next step: the recursive part starts from a parent so doesn't need to remember current.
     
+    let prevNode graph (nd: SubjectNode) = 
+        if nd.broader.Count > 0 then
+            let siblings = Array.ofSeq (SubjectNode.sortedChildren nd.broader.[0])
+            let myIndex = Array.findIndex (fun n -> n = nd) siblings
+            if myIndex > 0 then Some siblings.[myIndex-1]
+            else None
+        // has no parent; we're at the top.
+        else None
+
     /// Return the node for a given CN range, trying exact match first,
     ///  else find the most direct parent of that range.
     /// (Will be) used to generate a link to follow for "see also".
@@ -256,6 +285,7 @@ module SubjectGraph =
                 Seq.collect search' fromnode.narrower
                 |>  Seq.toList
         search' graph.uriIndex.[startURI] // need exception handling? here?
+
 
     /// Totally awesome, perfect, clear, generic node insertion function.
     /// Dependency injection! an isChild comparison function: CNRange.isSubRange
@@ -417,8 +447,7 @@ let linkItemByCallNumber (graph: SubjectGraph) (item: BookRecord) =
                 else findItemParent head
             | [] -> // No containment, use the the rightmost <= node.
                 // I hoped it was already sorted, but this appears to fix a bug.
-                let sorted = Seq.sortBy (fun (nd: SubjectNode) -> nd.callNumRange.Value.startCN)
-                                atnode.narrower
+                let sorted = SubjectNode.sortedChildren atnode 
                 match (Seq.tryFindBack (fun (nd: SubjectNode) -> 
                                             nd.callNumRange.Value.startCN <= cn) 
                                        sorted) with
@@ -506,6 +535,50 @@ let querySubjectData (label: string) =
         + "} LIMIT 25\n" 
     Logger.Debug "Issued SPARQL query: %s" queryString
     sparqlQuery queryString
+
+// deserialize. The opens are a hint that maybe this should go elsewhere...
+// or in a module.
+
+open System.IO // for file read and write 
+open MBrace.FsPickler
+// open Newtonsoft.Json.Bson
+// open Newtonsoft.Json
+
+let loadGraph graphFileName = 
+    let instream = File.OpenRead graphFileName
+    (* let bsonReader = new BsonDataReader(instream)
+    let serializer = new JsonSerializer()
+    let graph = serializer.Deserialize<SubjectGraph>(bsonReader) *)
+    let serializer = FsPickler.CreateBinarySerializer()
+    let graph = serializer.Deserialize<SubjectGraph>(instream)
+    instream.Close()
+    graph
+
+let saveGraph (graph: SubjectGraph) graphFileName = 
+    (* let outstream = File.OpenWrite graphFileName
+    let bsonWriter = new BsonDataWriter(outstream)
+    let serializer = new JsonSerializer()
+    let _ = serializer.ReferenceLoopHandling <- ReferenceLoopHandling.Ignore
+    serializer.Serialize(bsonWriter, graph)
+    bsonWriter.Close()
+    outstream.Close() *)
+    let outstream = File.OpenWrite graphFileName
+    let serializer = FsPickler.CreateBinarySerializer()
+    //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
+    //graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
+    serializer.Serialize(outstream, graph)
+    (* let pickle = serializer.Pickle(graph)
+    outstream.Write(serializer.Pickle(graph), 0, pickle.Length) *)
+    outstream.Close() 
+
+(* /// recreate BiserObjectify serialization code
+let buildSerializer () = 
+    let serinfo = 
+        BiserObjectify.Generator.Run
+            (typeof<SubjectGraph>, true, "./output/biser/", true, false, null)
+    printfn "%A" serinfo
+*)
+
 
 /// Attempt to retrieve a subject heading identifier for a subject label.
 /// As is, this works for complex subjects as well as topics. NOT CURRENTLY CALLED
@@ -688,47 +761,3 @@ let browseGraphCLI (graph : SubjectGraph) =
                 loop currentNode
         (* active pattern to match and interpret? *)
     loop graph.topNode
-        
-
-// deserialize. The opens are a hint that maybe this should go elsewhere...
-// or in a module.
-
-open System.IO // for file read and write 
-open MBrace.FsPickler
-// open Newtonsoft.Json.Bson
-// open Newtonsoft.Json
-
-(* /// recreate BiserObjectify serialization code
-let buildSerializer () = 
-    let serinfo = 
-        BiserObjectify.Generator.Run
-            (typeof<SubjectGraph>, true, "./output/biser/", true, false, null)
-    printfn "%A" serinfo
-*)
-
-let loadGraph graphFileName = 
-    let instream = File.OpenRead graphFileName
-    (* let bsonReader = new BsonDataReader(instream)
-    let serializer = new JsonSerializer()
-    let graph = serializer.Deserialize<SubjectGraph>(bsonReader) *)
-    let serializer = FsPickler.CreateBinarySerializer()
-    let graph = serializer.Deserialize<SubjectGraph>(instream)
-    instream.Close()
-    graph
-
-let saveGraph (graph: SubjectGraph) graphFileName = 
-    (* let outstream = File.OpenWrite graphFileName
-    let bsonWriter = new BsonDataWriter(outstream)
-    let serializer = new JsonSerializer()
-    let _ = serializer.ReferenceLoopHandling <- ReferenceLoopHandling.Ignore
-    serializer.Serialize(bsonWriter, graph)
-    bsonWriter.Close()
-    outstream.Close() *)
-    let outstream = File.OpenWrite graphFileName
-    let serializer = FsPickler.CreateBinarySerializer()
-    //let graphFormatter = ZeroFormatterSerializer.Serialize(graph)
-    //graph.subjectPrefixIndex.Clear() // TODO: may have to remove this.
-    serializer.Serialize(outstream, graph)
-    (* let pickle = serializer.Pickle(graph)
-    outstream.Write(serializer.Pickle(graph), 0, pickle.Length) *)
-    outstream.Close() 
