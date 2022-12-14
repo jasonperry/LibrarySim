@@ -1,7 +1,9 @@
 #!/bin/bash
 
+DATADIR=/mnt/ssd/media/datasets/librarydata/loc
+
 if [ "$1" == "-c" ]; then
-    dotnet run -c sgSettings.config buildLCClassGraph datasets/LOC/Class.thru.d130228.records-JPFIX.xml.gz
+    dotnet run -c sgSettings.config buildLCClassGraph $datadir/Class.thru.d130228.records-JPFIX.xml.gz
     start=1
 elif [ "$1" == "-s" ]; then
     start=$2
